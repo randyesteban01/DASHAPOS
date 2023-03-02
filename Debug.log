@@ -1,0 +1,867 @@
+
+Tue Dec 17 22:08:58 2013
+	Error: OpenSerialPort: 0x00000005
+
+Tue Dec 17 22:11:12 2013
+	Error: OpenSerialPort: 0x00000005
+
+Tue Dec 17 22:13:39 2013
+	Error: OpenSerialPort: 0x00000005
+
+Tue Dec 17 22:13:47 2013
+	Error: OpenSerialPort: 0x00000005
+
+Tue Dec 17 22:14:54 2013
+	Error: OpenSerialPort: 0x00000005
+
+Tue Dec 17 22:17:09 2013
+	*Warning* -> CampoString: linea:761, param: NCF    : A010010010200001020, maxlen es: 19
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CB 0A 01 1C 00 00 1C 1C 1C 30 30 30 31 1C 30 ..........0001.0
+  0010 30 30 31 1C 4E 43 46 20 20 20 20 3A 20 41 30 31 001.NCF    : A01
+  0020 30 30 31 30 30 31 30 32 30 30 30 30 31 30 32 30 0010010200001020
+  0030 1C 1C 1C 03 30 38 42 33                         ....08B3
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CB 00 00 1C C0 00 1C 00 01 1C 02 06 1C 03    ...............
+
+Tue Dec 17 22:17:09 2013
+	* Error - linea 665, Fiscal Status A610
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CD 0A 1B 02 1C 00 00 1C 1C 1C 1C 1C 1C 1C 1C ................
+  0010 1C 1C 4C 41 56 41 44 4F 20 49 4E 54 45 52 49 4F ..LAVADO INTERIO
+  0020 52 1C 31 30 30 30 1C 35 30 30 30 30 1C 31 38 30 R.1000.50000.180
+  0030 30 03 30 39 34 33                               0.0943
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CD 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:09 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CF 0A 1B 03 1C 00 00 03 30 31 31 38          .........0118
+
+Tue Dec 17 22:17:09 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:09 2013
+  0000 02 CF 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:09 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:09 2013
+  0000 02 D1 0A 05 1C 00 00 1C 31 1C 31 30 30 30 30 30 ........1.100000
+  0010 1C 1C 1C 03 30 32 44 46                         ....02DF
+
+Tue Dec 17 22:17:09 2013
+  0000 02 D1 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:09 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:09 2013
+  0000 02 D3 0A 12 1C 00 00 1C 43 61 6A 65 72 6F 3A 20 ........Cajero: 
+  0010 45 43 45 50 45 44 41 03 30 35 43 31             ECEPEDA.05C1
+
+Tue Dec 17 22:17:09 2013
+  0000 02 D3 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:09 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:09 2013
+  0000 02 D5 0A 12 1C 00 00 1C 43 61 6A 61 20 20 3A 20 ........Caja  : 
+  0010 31 03 30 33 36 38                               1.0368
+
+Tue Dec 17 22:17:10 2013
+  0000 02 D5 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 D7 0A 12 1C 00 00 1C 53 69 20 6E 6F 20 65 72 ........Si no er
+  0010 65 73 20 70 61 72 74 65 20 64 65 20 6C 61 20 73 es parte de la s
+  0020 6F 6C 75 63 69 6F 6E 2C 03 30 43 38 32          olucion,.0C82
+
+Tue Dec 17 22:17:10 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:10 2013
+  0000 02 D7 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 D9 0A 12 1C 00 00 1C 65 72 65 73 20 70 61 72 ........eres par
+  0010 74 65 20 64 65 6C 20 70 72 6F 62 6C 65 6D 61 2E te del problema.
+  0020 03 30 41 31 32                                  .0A12
+
+Tue Dec 17 22:17:10 2013
+  0000 02 D9 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DB 0A 12 1C 00 00 1C 03 30 31 33 34          .........0134
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DB 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DD 0A 12 1C 00 00 1C 47 72 61 63 69 61 73 20 ........Gracias 
+  0010 70 6F 72 20 70 72 65 66 65 72 69 72 6E 6F 73 2E por preferirnos.
+  0020 2E 2E 2E 03 30 41 45 38                         ....0AE8
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DD 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DF 0A 06 1C 00 00 1C 1C 1C 1C 1C 1C 03 30 31 ..............01
+  0010 42 38                                           B8
+
+Tue Dec 17 22:17:10 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:10 2013
+  0000 02 DF 00 00 1C C0 00 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+	* Error - linea 665, Fiscal Status A620
+
+Tue Dec 17 22:17:10 2013
+  0000 02 E1 07 01 1C 00 00 1C 30 31 03 30 31 38 37    ........01.0187
+
+Tue Dec 17 22:17:10 2013
+  0000 02 E1 00 00 1C C0 00 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+  0000 02 E3 07 1B 02 1C 00 00 03 30 31 32 38          .........0128
+
+Tue Dec 17 22:17:10 2013
+  0000 02 E3 00 00 1C C0 00 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:17:10 2013
+  0000 02 E5 07 07 1C 00 00 03 30 31 31 34             ........0114
+
+Tue Dec 17 22:17:10 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:11 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:11 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:17:11 2013
+  0000 02 E5 00 00 1C C0 00 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:23 2013
+  0000 02 E7 0A 01 1C 00 00 1C 1C 1C 30 30 30 31 1C 30 ..........0001.0
+  0010 30 30 31 1C 41 30 31 30 30 31 30 30 31 30 32 30 001.A01001001020
+  0020 30 30 30 31 30 32 31 1C 1C 1C 03 30 37 31 46    0001021....071F
+
+Tue Dec 17 22:18:23 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:23 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:24 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:24 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:24 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:25 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:25 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:25 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:26 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:26 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:26 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:27 2013
+  0000 02 E7 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:27 2013
+  0000 02 E9 0A 1B 02 1C 00 00 1C 1C 1C 1C 1C 1C 1C 1C ................
+  0010 1C 1C 4C 41 56 41 44 4F 20 49 4E 54 45 52 49 4F ..LAVADO INTERIO
+  0020 52 1C 31 30 30 30 1C 35 30 30 30 30 1C 31 38 30 R.1000.50000.180
+  0030 30 03 30 39 35 46                               0.095F
+
+Tue Dec 17 22:18:27 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:27 2013
+  0000 02 E9 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:27 2013
+  0000 02 EB 0A 1B 03 1C 00 00 03 30 31 33 34          .........0134
+
+Tue Dec 17 22:18:27 2013
+  0000 02 EB 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 35 ...............5
+  0010 30 30 30 30 03                                  0000.
+
+Tue Dec 17 22:18:27 2013
+  0000 02 ED 0A 05 1C 00 00 1C 31 1C 31 30 30 30 30 30 ........1.100000
+  0010 1C 1C 1C 03 30 32 46 42                         ....02FB
+
+Tue Dec 17 22:18:28 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:28 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:28 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:29 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:29 2013
+  0000 02 ED 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 30 ...............0
+  0010 1C 33 36 30 30 30 03                            .36000.
+
+Tue Dec 17 22:18:29 2013
+  0000 02 EF 0A 12 1C 00 00 1C 43 61 6A 65 72 6F 3A 20 ........Cajero: 
+  0010 45 43 45 50 45 44 41 03 30 35 44 44             ECEPEDA.05DD
+
+Tue Dec 17 22:18:29 2013
+  0000 02 EF 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F1 0A 12 1C 00 00 1C 43 61 6A 61 20 20 3A 20 ........Caja  : 
+  0010 31 03 30 33 38 34                               1.0384
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F1 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F3 0A 12 1C 00 00 1C 53 69 20 6E 6F 20 65 72 ........Si no er
+  0010 65 73 20 70 61 72 74 65 20 64 65 20 6C 61 20 73 es parte de la s
+  0020 6F 6C 75 63 69 6F 6E 2C 03 30 43 39 45          olucion,.0C9E
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F3 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F5 0A 12 1C 00 00 1C 65 72 65 73 20 70 61 72 ........eres par
+  0010 74 65 20 64 65 6C 20 70 72 6F 62 6C 65 6D 61 2E te del problema.
+  0020 03 30 41 32 45                                  .0A2E
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F5 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F7 0A 12 1C 00 00 1C 03 30 31 35 30          .........0150
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F7 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F9 0A 12 1C 00 00 1C 47 72 61 63 69 61 73 20 ........Gracias 
+  0010 70 6F 72 20 70 72 65 66 65 72 69 72 6E 6F 73 2E por preferirnos.
+  0020 2E 2E 2E 03 30 42 30 34                         ....0B04
+
+Tue Dec 17 22:18:29 2013
+  0000 02 F9 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:29 2013
+  0000 02 FB 0A 06 1C 00 00 1C 1C 1C 1C 1C 1C 03 30 31 ..............01
+  0010 44 34                                           D4
+
+Tue Dec 17 22:18:30 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:30 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:30 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:31 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:31 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:31 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:32 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:32 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:32 2013
+  0000 02 FB 00 00 1C C0 80 1C 00 00 1C 00 00 1C 1C 31 ...............1
+  0010 30 31 30 38 30 30 30 30 30 30 30 30 32 34 34 1C 010800000000244.
+  0020 36 34 30 30 30 1C 33 36 30 30 30 03             64000.36000.
+
+Tue Dec 17 22:18:32 2013
+  0000 02 FD 07 01 1C 00 00 1C 30 31 03 30 31 41 33    ........01.01A3
+
+Tue Dec 17 22:18:32 2013
+  0000 02 FD 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:32 2013
+  0000 02 FF 07 1B 02 1C 00 00 03 30 31 34 34          .........0144
+
+Tue Dec 17 22:18:32 2013
+  0000 02 FF 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:18:32 2013
+  0000 02 81 07 07 1C 00 00 03 30 30 42 30             ........00B0
+
+Tue Dec 17 22:18:32 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:33 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:33 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:18:33 2013
+  0000 02 81 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:47 2013
+  0000 02 83 0A 01 1C 00 00 1C 1C 1C 30 30 30 31 1C 30 ..........0001.0
+  0010 30 30 31 1C 41 30 31 30 30 31 30 30 31 30 32 30 001.A01001001020
+  0020 30 30 30 31 30 32 32 1C 1C 1C 03 30 36 42 43    0001022....06BC
+
+Tue Dec 17 22:19:47 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:48 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:48 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:48 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:49 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:49 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:49 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:50 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:50 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:50 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:51 2013
+  0000 02 83 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:51 2013
+  0000 02 85 0A 1B 02 1C 00 00 1C 1C 1C 1C 1C 1C 1C 1C ................
+  0010 1C 1C 4C 41 56 41 44 4F 20 49 4E 54 45 52 49 4F ..LAVADO INTERIO
+  0020 52 1C 31 30 30 30 1C 35 30 30 30 30 1C 31 38 30 R.1000.50000.180
+  0030 30 03 30 38 46 42                               0.08FB
+
+Tue Dec 17 22:19:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:52 2013
+  0000 02 85 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:52 2013
+  0000 02 87 0A 1B 03 1C 00 00 03 30 30 44 30          .........00D0
+
+Tue Dec 17 22:19:52 2013
+  0000 02 87 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 35 ...............5
+  0010 30 30 30 30 03                                  0000.
+
+Tue Dec 17 22:19:52 2013
+  0000 02 89 0A 05 1C 00 00 1C 31 1C 32 30 30 30 30 30 ........1.200000
+  0010 1C 1C 1C 03 30 32 39 38                         ....0298
+
+Tue Dec 17 22:19:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:53 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:53 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:53 2013
+  0000 02 89 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 30 ...............0
+  0010 1C 31 33 36 30 30 30 03                         .136000.
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8B 0A 12 1C 00 00 1C 43 61 6A 65 72 6F 3A 20 ........Cajero: 
+  0010 45 43 45 50 45 44 41 03 30 35 37 39             ECEPEDA.0579
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8B 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8D 0A 12 1C 00 00 1C 43 61 6A 61 20 20 3A 20 ........Caja  : 
+  0010 31 03 30 33 32 30                               1.0320
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8D 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8F 0A 12 1C 00 00 1C 53 69 20 6E 6F 20 65 72 ........Si no er
+  0010 65 73 20 70 61 72 74 65 20 64 65 20 6C 61 20 73 es parte de la s
+  0020 6F 6C 75 63 69 6F 6E 2C 03 30 43 33 41          olucion,.0C3A
+
+Tue Dec 17 22:19:53 2013
+  0000 02 8F 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:53 2013
+  0000 02 91 0A 12 1C 00 00 1C 65 72 65 73 20 70 61 72 ........eres par
+  0010 74 65 20 64 65 6C 20 70 72 6F 62 6C 65 6D 61 2E te del problema.
+  0020 03 30 39 43 41                                  .09CA
+
+Tue Dec 17 22:19:54 2013
+  0000 02 91 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:54 2013
+  0000 02 93 0A 12 1C 00 00 1C 03 30 30 45 43          .........00EC
+
+Tue Dec 17 22:19:54 2013
+  0000 02 93 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:54 2013
+  0000 02 95 0A 12 1C 00 00 1C 47 72 61 63 69 61 73 20 ........Gracias 
+  0010 70 6F 72 20 70 72 65 66 65 72 69 72 6E 6F 73 2E por preferirnos.
+  0020 2E 2E 2E 03 30 41 41 30                         ....0AA0
+
+Tue Dec 17 22:19:54 2013
+  0000 02 95 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:54 2013
+  0000 02 97 0A 06 1C 00 00 1C 1C 1C 1C 1C 1C 03 30 31 ..............01
+  0010 37 30                                           70
+
+Tue Dec 17 22:19:54 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:54 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:54 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:19:56 2013
+  0000 02 97 00 00 1C C0 80 1C 00 00 1C 00 00 1C 1C 31 ...............1
+  0010 30 31 30 38 30 30 30 30 30 30 30 30 32 34 35 1C 010800000000245.
+  0020 36 34 30 30 30 1C 31 33 36 30 30 30 03          64000.136000.
+
+Tue Dec 17 22:19:56 2013
+  0000 02 99 07 01 1C 00 00 1C 30 31 03 30 31 33 46    ........01.013F
+
+Tue Dec 17 22:19:56 2013
+  0000 02 99 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:19:56 2013
+  0000 02 9B 07 1B 02 1C 00 00 03 30 30 45 30          .........00E0
+
+Tue Dec 17 22:19:56 2013
+  0000 02 9B 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:27:50 2013
+  0000 02 B9 0A 01 1C 00 00 1C 1C 1C 30 30 30 31 1C 30 ..........0001.0
+  0010 30 30 31 1C 41 30 31 30 30 31 30 30 31 30 32 30 001.A01001001020
+  0020 30 30 30 31 30 32 34 1C 1C 1C 03 30 36 46 34    0001024....06F4
+
+Tue Dec 17 22:27:50 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:50 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:51 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:52 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:53 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:53 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:53 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:53 2013
+  0000 02 B9 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:27:53 2013
+  0000 02 BB 0A 1B 02 1C 00 00 1C 1C 1C 1C 1C 1C 1C 1C ................
+  0010 1C 1C 4C 41 56 41 44 4F 20 49 4E 54 45 52 49 4F ..LAVADO INTERIO
+  0020 52 1C 31 30 30 30 1C 35 30 30 30 30 1C 31 38 30 R.1000.50000.180
+  0030 30 03 30 39 33 31                               0.0931
+
+Tue Dec 17 22:27:54 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:54 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:54 2013
+  0000 02 BB 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:27:54 2013
+  0000 02 BD 0A 1B 03 1C 00 00 03 30 31 30 36          .........0106
+
+Tue Dec 17 22:27:54 2013
+  0000 02 BD 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 35 ...............5
+  0010 30 30 30 30 03                                  0000.
+
+Tue Dec 17 22:27:54 2013
+  0000 02 BF 0A 05 1C 00 00 1C 33 1C 35 30 30 30 30 1C ........3.50000.
+  0010 1C 1C 03 30 32 41 33                            ...02A3
+
+Tue Dec 17 22:27:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:55 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:56 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:27:56 2013
+  0000 02 BF 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 31 ...............1
+  0010 34 30 30 30 1C 30 03                            4000.0.
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C1 0A 12 1C 00 00 1C 43 61 6A 65 72 6F 3A 20 ........Cajero: 
+  0010 45 43 45 50 45 44 41 03 30 35 41 46             ECEPEDA.05AF
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C1 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C3 0A 12 1C 00 00 1C 43 61 6A 61 20 20 3A 20 ........Caja  : 
+  0010 31 03 30 33 35 36                               1.0356
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C3 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C5 0A 12 1C 00 00 1C 53 69 20 6E 6F 20 65 72 ........Si no er
+  0010 65 73 20 70 61 72 74 65 20 64 65 20 6C 61 20 73 es parte de la s
+  0020 6F 6C 75 63 69 6F 6E 2C 03 30 43 37 30          olucion,.0C70
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C5 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C7 0A 12 1C 00 00 1C 65 72 65 73 20 70 61 72 ........eres par
+  0010 74 65 20 64 65 6C 20 70 72 6F 62 6C 65 6D 61 2E te del problema.
+  0020 03 30 41 30 30                                  .0A00
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C7 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C9 0A 12 1C 00 00 1C 03 30 31 32 32          .........0122
+
+Tue Dec 17 22:27:56 2013
+  0000 02 C9 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CB 0A 12 1C 00 00 1C 47 72 61 63 69 61 73 20 ........Gracias 
+  0010 70 6F 72 20 70 72 65 66 65 72 69 72 6E 6F 73 2E por preferirnos.
+  0020 2E 2E 2E 03 30 41 44 36                         ....0AD6
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CB 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CD 0A 06 1C 00 00 1C 1C 1C 1C 1C 1C 03 30 31 ..............01
+  0010 41 36                                           A6
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CD 00 00 1C C0 81 1C 00 01 1C 0A 09 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CF 07 01 1C 00 00 1C 30 31 03 30 31 37 35    ........01.0175
+
+Tue Dec 17 22:27:56 2013
+  0000 02 CF 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+  0000 02 D1 07 1B 02 1C 00 00 03 30 31 31 36          .........0116
+
+Tue Dec 17 22:27:56 2013
+  0000 02 D1 00 00 1C C0 81 1C 00 01 1C 01 02 1C 03    ...............
+
+Tue Dec 17 22:27:56 2013
+	* Error - linea 665, Fiscal Status B620
+
+Tue Dec 17 22:29:00 2013
+  0000 02 D5 0A 01 1C 00 00 1C 1C 1C 30 30 30 31 1C 30 ..........0001.0
+  0010 30 30 31 1C 41 30 31 30 30 31 30 30 31 30 32 30 001.A01001001020
+  0020 30 30 30 31 30 32 35 1C 1C 1C 03 30 37 31 31    0001025....0711
+
+Tue Dec 17 22:29:00 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:00 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:01 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:01 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:01 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:02 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:02 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:02 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:03 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:03 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:03 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:03 2013
+  0000 02 D5 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:03 2013
+  0000 02 D7 0A 1B 02 1C 00 00 1C 1C 1C 1C 1C 1C 1C 1C ................
+  0010 1C 1C 4C 41 56 41 44 4F 20 49 4E 54 45 52 49 4F ..LAVADO INTERIO
+  0020 52 1C 31 30 30 30 1C 35 30 30 30 30 1C 31 38 30 R.1000.50000.180
+  0030 30 03 30 39 34 44                               0.094D
+
+Tue Dec 17 22:29:04 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:04 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:04 2013
+  0000 02 D7 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:04 2013
+  0000 02 D9 0A 1B 03 1C 00 00 03 30 31 32 32          .........0122
+
+Tue Dec 17 22:29:04 2013
+  0000 02 D9 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 35 ...............5
+  0010 30 30 30 30 03                                  0000.
+
+Tue Dec 17 22:29:04 2013
+  0000 02 DB 0A 05 1C 00 00 1C 33 1C 31 30 30 30 30 30 ........3.100000
+  0010 1C 1C 1C 03 30 32 45 42                         ....02EB
+
+Tue Dec 17 22:29:04 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:05 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:05 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:05 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:06 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:06 2013
+  0000 02 DB 00 00 1C C0 81 1C 00 00 1C 00 00 1C 1C 30 ...............0
+  0010 1C 33 36 30 30 30 03                            .36000.
+
+Tue Dec 17 22:29:06 2013
+  0000 02 DD 0A 12 1C 00 00 1C 43 61 6A 65 72 6F 3A 20 ........Cajero: 
+  0010 45 43 45 50 45 44 41 03 30 35 43 42             ECEPEDA.05CB
+
+Tue Dec 17 22:29:06 2013
+  0000 02 DD 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 DF 0A 12 1C 00 00 1C 43 61 6A 61 20 20 3A 20 ........Caja  : 
+  0010 31 03 30 33 37 32                               1.0372
+
+Tue Dec 17 22:29:06 2013
+  0000 02 DF 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E1 0A 12 1C 00 00 1C 53 69 20 6E 6F 20 65 72 ........Si no er
+  0010 65 73 20 70 61 72 74 65 20 64 65 20 6C 61 20 73 es parte de la s
+  0020 6F 6C 75 63 69 6F 6E 2C 03 30 43 38 43          olucion,.0C8C
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E1 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E3 0A 12 1C 00 00 1C 65 72 65 73 20 70 61 72 ........eres par
+  0010 74 65 20 64 65 6C 20 70 72 6F 62 6C 65 6D 61 2E te del problema.
+  0020 03 30 41 31 43                                  .0A1C
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E3 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E5 0A 12 1C 00 00 1C 03 30 31 33 45          .........013E
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E5 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E7 0A 12 1C 00 00 1C 47 72 61 63 69 61 73 20 ........Gracias 
+  0010 70 6F 72 20 70 72 65 66 65 72 69 72 6E 6F 73 2E por preferirnos.
+  0020 2E 2E 2E 03 30 41 46 32                         ....0AF2
+
+Tue Dec 17 22:29:06 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E7 00 00 1C C0 81 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:06 2013
+  0000 02 E9 0A 06 1C 00 00 1C 1C 1C 1C 1C 1C 03 30 31 ..............01
+  0010 43 32                                           C2
+
+Tue Dec 17 22:29:07 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:07 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:07 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:08 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:08 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:08 2013
+	*Alerta: Recibi paquete de respuesta intermedia 
+
+Tue Dec 17 22:29:08 2013
+  0000 02 E9 00 00 1C C0 80 1C 00 00 1C 00 00 1C 1C 31 ...............1
+  0010 30 31 30 38 30 30 30 30 30 30 30 30 32 34 38 1C 010800000000248.
+  0020 36 34 30 30 30 1C 33 36 30 30 30 03             64000.36000.
+
+Tue Dec 17 22:29:08 2013
+  0000 02 EB 07 01 1C 00 00 1C 30 31 03 30 31 39 31    ........01.0191
+
+Tue Dec 17 22:29:08 2013
+  0000 02 EB 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............
+
+Tue Dec 17 22:29:08 2013
+  0000 02 ED 07 1B 02 1C 00 00 03 30 31 33 32          .........0132
+
+Tue Dec 17 22:29:08 2013
+  0000 02 ED 00 00 1C C0 80 1C 00 00 1C 00 00 1C 03    ...............

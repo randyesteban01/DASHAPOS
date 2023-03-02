@@ -1,0 +1,9 @@
+IF object_id('tempdb.dbo.##TicSerie') IS NULL
+ begin
+CREATE TABLE dbo.##TicSerie ( 
+ [ser_secuencia] [int] NOT NULL ,
+ [ticket] [int] NOT NULL ,
+ [producto] [int] NULL ,
+ [ser_numero] [varchar] (30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL
+ )
+ end begin delete from dbo.##TicSerie; end

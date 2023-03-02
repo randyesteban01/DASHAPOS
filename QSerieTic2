@@ -1,0 +1,5 @@
+select  *
+from dbo.##TicSerie
+where ticket = :ticket
+    and producto = :producto
+order by ser_secuencia

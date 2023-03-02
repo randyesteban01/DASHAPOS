@@ -1,0 +1,67 @@
+              D&R TECHNOLOGY
+            Av. Duarte No.150
+        Las Terrenas, Samana, R.D.
+               809-240-5197
+              RNC:131038298
+ 
+              CUADRE DE CAJA
+ 
+Cuadre#: 1
+Desde  : 27-11-2017 06:00:00 AM
+Hasta  : 28-11-2017 05:59:59 AM
+Cajero : RANDY
+Caja   : 1
+ 
+                 EFECTIVO
+                 --------
+#Ticket       N. C. F.         Monto   
+---------------------------------------
+     4          1.12
+     5        100.00
+---------------------------------------
+Total :       101.12
+ 
+         VENTA POR FORMA DE PAGO
+         -----------------------
+DEPOSITO      :         0.00
+TOTAL EFECTIVO:       101.12
+TOTAL TARJETA :         0.00
+TOTAL CHEQUE  :         0.00
+BONOS CLUB    :         0.00
+OTROS         :         0.00
+NOTAS DE CR   :         0.00
+---------------------------------------
+TOTAL CONTADO :       101.12
+TOTAL NOTAS CR:         0.00
+TOTAL CREDITO :         0.00
+GRABADO 18%   :        85.69
+TOTAL ITBIS   :        15.43
+TOTAL EXENTO  :         0.00
+TOTAL ANULADOS:         0.00
+CANT.  BOLETOS: 0
+CANTIDAD TKS  :            3
+TKS ANULADOS  :            0
+TOTAL EN CAJA :       101.12
+ 
+ 
+ 
+ 
+ 
+ 
+------------------------
+Firma del Cajero
+ 
+ 
+ 
+ 
+ 
+------------------------
+Firma del Supervisor
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

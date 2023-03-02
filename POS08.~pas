@@ -1,0 +1,167 @@
+unit POS08;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, ExtCtrls, ComCtrls, ToolWin, Buttons, Grids, DBGrids, DB, ADODB;
+
+type
+  TfrmAnular = class(TForm)
+    ToolBar1: TToolBar;
+    btsalir: TSpeedButton;
+    btanular: TSpeedButton;
+    DBGrid1: TDBGrid;
+    QTicket: TADOQuery;
+    QTicketusu_codigo: TIntegerField;
+    QTicketfecha: TDateTimeField;
+    QTicketcaja: TIntegerField;
+    QTicketticket: TIntegerField;
+    QTickettotal: TBCDField;
+    QTicketdescuento: TBCDField;
+    QTicketNCF_Fijo: TStringField;
+    QTicketNCF_Secuencia: TBCDField;
+    QTicketitbis: TBCDField;
+    QTicketnombre: TStringField;
+    QTicketrnc: TStringField;
+    QTicketstatus: TStringField;
+    dsTicket: TDataSource;
+    QTicketNCF: TStringField;
+    btimprimir: TSpeedButton;
+    fecha: TDateTimePicker;
+    fecha2: TDateTimePicker;
+    hora1: TDateTimePicker;
+    hora2: TDateTimePicker;
+    btdomicilio: TSpeedButton;
+    procedure btsalirClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure QTicketCalcFields(DataSet: TDataSet);
+    procedure btanularClick(Sender: TObject);
+    procedure dsTicketDataChange(Sender: TObject; Field: TField);
+    procedure FormCreate(Sender: TObject);
+    procedure btimprimirClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure DBGrid1KeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    Imprimir, supervisor, seleccion, empresa : integer;
+    cliente : string;
+    Llevar : boolean;
+  end;
+
+var
+  frmAnular: TfrmAnular;
+
+implementation
+
+uses POS01, POS23;
+
+{$R *.dfm}
+
+procedure TfrmAnular.btsalirClick(Sender: TObject);
+begin
+  Close;
+end;
+
+procedure TfrmAnular.FormKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if key = vk_escape then btsalirClick(Self);
+  if (key = vk_f1) and (btanular.Visible)   then btanularClick(Self);
+  if (key = vk_f2) and (btimprimir.Visible) then btimprimirClick(Self);
+end;
+
+procedure TfrmAnular.QTicketCalcFields(DataSet: TDataSet);
+begin
+  if not QTicketNCF_Fijo.IsNull then
+    QTicketNCF.Value := QTicketNCF_Fijo.Value + FormatFloat('00000000',QTicketNCF_Secuencia.value)
+  else
+    QTicketNCF.Value := '';
+end;
+
+procedure TfrmAnular.btanularClick(Sender: TObject);
+begin
+  if MessageDlg('ESTA SEGURO QUE DESEA ANULAR ESTE TICKET?',mtConfirmation,[mbyes,mbno],0) = mryes then
+  begin
+    dm.Query1.Close;
+    dm.Query1.SQL.Clear;
+    dm.Query1.SQL.Add('update montos_ticket');
+    dm.Query1.SQL.Add('set supervisor = :sup');
+    dm.Query1.SQL.Add('where caja = :caj');
+    dm.Query1.SQL.Add('and usu_codigo = :usu');
+    dm.Query1.SQL.Add('and fecha = convert(datetime, :fec, 105)');
+    dm.Query1.SQL.Add('and ticket = :tik');
+    dm.Query1.Parameters.ParamByName('sup').Value    := supervisor;
+    dm.Query1.Parameters.ParamByName('usu').Value    := QTicketusu_codigo.Value;
+    dm.Query1.Parameters.ParamByName('fec').DataType := ftDate;
+    dm.Query1.Parameters.ParamByName('fec').Value    := QTicketfecha.Value;
+    dm.Query1.Parameters.ParamByName('caj').Value    := QTicketcaja.Value;
+    dm.Query1.Parameters.ParamByName('tik').Value    := QTicketticket.Value;
+    dm.Query1.ExecSQL;    
+
+    dm.Query1.Close;
+    dm.Query1.SQL.Clear;
+    dm.Query1.SQL.Add('execute pr_anula_ticket :usu, :caj, :fec, :tik');
+    dm.Query1.Parameters.ParamByName('usu').Value    := QTicketusu_codigo.Value;
+    dm.Query1.Parameters.ParamByName('fec').DataType := ftDate;
+    dm.Query1.Parameters.ParamByName('fec').Value    := QTicketfecha.Value;
+    dm.Query1.Parameters.ParamByName('caj').Value    := QTicketcaja.Value;
+    dm.Query1.Parameters.ParamByName('tik').Value    := QTicketticket.Value;
+    dm.Query1.ExecSQL;
+    Close;
+  end;
+end;
+
+procedure TfrmAnular.dsTicketDataChange(Sender: TObject; Field: TField);
+begin
+  btanular.Visible := (QTicket.RecordCount > 0) and (not Llevar);
+end;
+
+procedure TfrmAnular.FormCreate(Sender: TObject);
+begin
+  fecha.Date  := Date-1;
+  fecha2.Date := Date;
+  hora1.Date  := Date-1;
+  hora2.Date  := Date;
+  hora1.Time  := StrToTime('08:00:00');
+  hora2.Time  := StrToTime('23:59:59');
+  Imprimir := 0;
+end;
+
+procedure TfrmAnular.btimprimirClick(Sender: TObject);
+begin
+  Imprimir := 1;
+  Close;
+end;
+
+procedure TfrmAnular.FormActivate(Sender: TObject);
+begin
+  btanular.Visible    := (not Llevar) and (btimprimir.Visible = false);
+  btimprimir.Visible  := (not Llevar) and (btanular.Visible = false);
+  btdomicilio.Visible := (Llevar) and (btanular.Visible = false) and (btimprimir.Visible = false);
+end;
+
+procedure TfrmAnular.DBGrid1KeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if key = vk_return then
+  begin
+    if Llevar then
+    begin
+      Application.CreateForm(tfrmDomicilio, frmDomicilio);
+      frmDomicilio.ShowModal;
+      seleccion := frmDomicilio.seleccion;
+      empresa   := frmDomicilio.QClientesemp_codigo.AsInteger;
+      cliente   := frmDomicilio.QClientescli_referencia.AsString;
+      frmDomicilio.Release;
+      if seleccion = 1 then
+        Close;
+    end;
+  end;
+end;
+
+end.
