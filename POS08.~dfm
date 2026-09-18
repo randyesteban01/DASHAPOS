@@ -1,6 +1,6 @@
 object frmAnular: TfrmAnular
-  Left = 329
-  Top = 90
+  Left = 459
+  Top = 333
   ActiveControl = DBGrid1
   BorderIcons = []
   BorderStyle = bsSingle
@@ -603,7 +603,7 @@ object frmAnular: TfrmAnular
       'select'
       'usu_codigo, fecha, caja, ticket,'
       'total, descuento, NCF_Fijo, NCF_Secuencia,'
-      'itbis, nombre, rnc, status'
+      'itbis, nombre, rnc, status, emp_codigo'
       'from'
       'montos_ticket'
       'where'
@@ -671,11 +671,83 @@ object frmAnular: TfrmAnular
       FieldName = 'NCF'
       Calculated = True
     end
+    object QTicketemp_codigo: TIntegerField
+      FieldName = 'emp_codigo'
+    end
+    object QTicketencf: TStringField
+      FieldName = 'encf'
+      Size = 100
+    end
   end
   object dsTicket: TDataSource
     DataSet = QTicket
     OnDataChange = dsTicketDataChange
     Left = 192
     Top = 200
+  end
+  object qImpCardNet: TADOQuery
+    Connection = DM.ADOSIGMA
+    Parameters = <
+      item
+        Name = 'emp'
+        DataType = ftInteger
+        Size = -1
+        Value = Null
+      end
+      item
+        Name = 'tic'
+        DataType = ftInteger
+        Size = -1
+        Value = Null
+      end
+      item
+        Name = 'fec'
+        DataType = ftDateTime
+        Size = -1
+        Value = Null
+      end
+      item
+        Name = 'caj'
+        DataType = ftInteger
+        Size = -1
+        Value = Null
+      end
+      item
+        Name = 'usu'
+        Size = -1
+        Value = Null
+      end>
+    SQL.Strings = (
+      'DECLARE @json varchar(max)'
+      'declare @emp int'
+      'declare @tic int'
+      'declare @fec datetime'
+      'declare @caj int'
+      'declare @usu int'
+      ''
+      'set @emp  = :emp'
+      'set @tic  = :tic'
+      'set @fec  = :fec'
+      'set @caj  = :caj'
+      'set @usu  = :usu'
+      ''
+      
+        'select for_veriphone_desc json, for_veriphone_devolucion jsondev' +
+        ', pagado monto, case when t.itbis = 0 then 0 else t.itbis end mo' +
+        'nto_itbis, t.total-t.itbis montosinitbis,'
+      's.emp_nombre sucursal, s.emp_direccion direccion'
+      'from formas_pago_ticket fp'
+      
+        'inner join montos_ticket t on fp.ticket=t.ticket and fp.fecha = ' +
+        't.fecha and fp.caja=t.caja and fp.usu_codigo = t.usu_codigo'
+      'inner join Parametros p on t.emp_codigo = p.emp_codigo'
+      'inner join empresas s on t.emp_codigo = s.emp_codigo'
+      'where isnull(for_veriphone_desc,'#39#39')<>'#39#39
+      
+        'and s.emp_codigo = @emp and fp.ticket = @tic and fp.caja = @caj ' +
+        'and fp.fecha = @fec and fp.usu_codigo = @usu'
+      'and isnull(fp.for_veriphone_desc,'#39#39')<>'#39#39)
+    Left = 160
+    Top = 288
   end
 end

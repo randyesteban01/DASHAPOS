@@ -1,6 +1,6 @@
 object frmAnular: TfrmAnular
   Left = 459
-  Top = 333
+  Top = 263
   ActiveControl = DBGrid1
   BorderIcons = []
   BorderStyle = bsSingle
@@ -603,7 +603,7 @@ object frmAnular: TfrmAnular
       'select'
       'usu_codigo, fecha, caja, ticket,'
       'total, descuento, NCF_Fijo, NCF_Secuencia,'
-      'itbis, nombre, rnc, status, emp_codigo'
+      'itbis, nombre, rnc, status, emp_codigo, encf'
       'from'
       'montos_ticket'
       'where'
@@ -673,6 +673,10 @@ object frmAnular: TfrmAnular
     end
     object QTicketemp_codigo: TIntegerField
       FieldName = 'emp_codigo'
+    end
+    object QTicketencf: TStringField
+      FieldName = 'encf'
+      Size = 100
     end
   end
   object dsTicket: TDataSource

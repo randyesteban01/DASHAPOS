@@ -328,7 +328,7 @@ end;
 
 procedure TfrmConfig.btUsuDelClick(Sender: TObject);
 begin
-  if MessageDlg('EstÔøΩ seguro?',mtConfirmation,[mbYes, mbNo],0) = mrYes then
+  if MessageDlg('Estù seguro?',mtConfirmation,[mbYes, mbNo],0) = mrYes then
     QUsuarios.Delete;
 end;
 
@@ -521,7 +521,7 @@ var
 
   end;
 begin
-  if MessageDlg('EstÔøΩ seguro que desea cerrar el turno?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
+  if MessageDlg('Estù seguro que desea cerrar el turno?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
   begin
     Puerto := PuertoSerial[Impresora.Puerto -1];
 
@@ -637,7 +637,7 @@ var
 
 begin
   //CierreJornada por dia
-  if MessageDlg('EstÔøΩ seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
+  if MessageDlg('Estù seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
   begin
 
     case  Impresora.IDPrinter of
@@ -700,7 +700,7 @@ var
    end;
 
 begin
-  if MessageDlg('EstÔøΩ seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
+  if MessageDlg('Estù seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
   begin
 
 
@@ -791,7 +791,7 @@ DriverFiscal1 := TDriverFiscal.Create(Self);
   End;
 
 begin
-  if MessageDlg('EstÔøΩ seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
+  if MessageDlg('Estù seguro que desea cerrar el la Jornada Fiscal?', mtConfirmation, [mbyes, mbno], 0) = mrYes then
   begin
       if Trim(Edit1.Text) = ''  Then
     Begin

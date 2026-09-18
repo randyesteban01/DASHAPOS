@@ -36,6 +36,7 @@ type
     btdomicilio: TSpeedButton;
     QTicketemp_codigo: TIntegerField;
     qImpCardNet: TADOQuery;
+    QTicketencf: TStringField;
     procedure btsalirClick(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
@@ -94,10 +95,29 @@ end;
 
 procedure TfrmAnular.QTicketCalcFields(DataSet: TDataSet);
 begin
-  if not QTicketNCF_Fijo.IsNull then
-    QTicketNCF.Value := QTicketNCF_Fijo.Value + FormatFloat('00000000',QTicketNCF_Secuencia.value)
-  else
-    QTicketNCF.Value := '';
+   if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+   begin
+       if not QTicketencf.IsNull then
+       begin
+           QTicketNCF.Value := QTicketencf.Value
+       end
+       else
+       begin
+           if not QTicketNCF_Fijo.IsNull then
+            QTicketNCF.Value := QTicketNCF_Fijo.Value + FormatFloat('00000000',QTicketNCF_Secuencia.value)
+          else
+            QTicketNCF.Value := '';
+       end;
+
+   end
+   else
+   begin
+      if not QTicketNCF_Fijo.IsNull then
+        QTicketNCF.Value := QTicketNCF_Fijo.Value + FormatFloat('00000000',QTicketNCF_Secuencia.value)
+      else
+        QTicketNCF.Value := '';
+   end;
+
 end;
 
 procedure TfrmAnular.btanularClick(Sender: TObject);

@@ -1,6 +1,6 @@
 object frmTarjeta: TfrmTarjeta
-  Left = 398
-  Top = 238
+  Left = 426
+  Top = 255
   ActiveControl = edtarjeta
   BorderIcons = []
   BorderStyle = bsSingle
@@ -905,5 +905,12 @@ object frmTarjeta: TfrmTarjeta
       '36'
       '48'
       '60')
+  end
+  object TimerPOS: TTimer
+    Enabled = False
+    Interval = 200
+    OnTimer = TimerPOSTimer
+    Left = 480
+    Top = 88
   end
 end

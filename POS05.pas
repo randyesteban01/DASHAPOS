@@ -4,9 +4,13 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Buttons, ExtCtrls, ECRti_Framework_TLB, uJSON;
+  Dialogs, StdCtrls, Buttons, ExtCtrls, ECRti_Framework_TLB, uJSON,ShlObj;
 
 type
+  // Declaración de la función para SHGetFolderPath
+  TSHGetFolderPathA = function(hwndOwner: HWND; nFolder: Integer; hToken: THandle;
+    dwFlags: DWORD; pszPath: PAnsiChar): HRESULT; stdcall;
+
   TfrmTarjeta = class(TForm)
     Label1: TLabel;
     Label2: TLabel;
@@ -30,6 +34,7 @@ type
     rgTipoVenta: TRadioGroup;
     lbCantCuotas: TLabel;
     cbbCantCuotas: TComboBox;
+    TimerPOS: TTimer;
     procedure btsalirClick(Sender: TObject);
     procedure btcalcClick(Sender: TObject);
     procedure btimprimirClick(Sender: TObject);
@@ -44,6 +49,11 @@ type
     procedure FormActivate(Sender: TObject);
 
     procedure btnPOSClick(Sender: TObject);
+
+    procedure LoadECRtiFramework;
+    function GetProgramFilesPath: string;
+    procedure TimerPOSTimer(Sender: TObject);
+   
   private
     { Private declarations }
      core : TCore;
@@ -65,6 +75,10 @@ type
 var
   frmTarjeta: TfrmTarjeta;
 
+const
+  CSIDL_PROGRAM_FILESX86 = $002A; // Valor hexadecimal de la constante
+  SHGFP_TYPE_CURRENT = 0; // Obtiene la carpeta actual
+  
 implementation
 
 uses POS02, POS22, POS00, POS01;
@@ -92,6 +106,7 @@ var
 begin
   if Trim(edMonto.Text) = '' then edMonto.Text := '0';
 
+ 
   MtoTarjeta := StrToFloat(format('%10.2F',[strtofloat(edMonto.Text)]));
  // caption := 'Tarjeta : ' +  MtoTarjeta
 //  if StrToFloat(format('%10.2F',[strtofloat(edMonto.Text)])) <>
@@ -123,8 +138,61 @@ begin
   end;
 end;
 
+function TfrmTarjeta.GetProgramFilesPath: string;
+const
+  CSIDL_PROGRAM_FILESX86 = $002A; // Identificador de "Program Files (x86)"
+  SHGFP_TYPE_CURRENT = 0; // Tipo de carpeta actual
+var
+  Shell32Handle: THandle;
+  SHGetFolderPathA: TSHGetFolderPathA;
+  Path: array[0..MAX_PATH] of AnsiChar;
+begin
+  // Cargar la DLL shell32.dll
+  Shell32Handle := LoadLibrary('shell32.dll');
+  if Shell32Handle <> 0 then
+  try
+    // Obtener la función SHGetFolderPathA
+    @SHGetFolderPathA := GetProcAddress(Shell32Handle, 'SHGetFolderPathA');
+    if Assigned(SHGetFolderPathA) then
+    begin
+      // Llamar a SHGetFolderPathA para obtener la ruta de "Program Files (x86)"
+      if SHGetFolderPathA(0, CSIDL_PROGRAM_FILESX86, 0, SHGFP_TYPE_CURRENT, @Path) = S_OK then
+        Result := IncludeTrailingPathDelimiter(string(Path)) // Convertir a string
+      else
+        Result := ''; // Si no se encuentra la ruta, devolver vacío
+    end
+    else
+      raise Exception.Create('SHGetFolderPathA no está disponible en este sistema.');
+  finally
+    FreeLibrary(Shell32Handle); // Liberar la DLL
+  end
+  else
+    raise Exception.Create('No se pudo cargar shell32.dll.');
+end;
+
+procedure TfrmTarjeta.LoadECRtiFramework;
+var
+  hLib: THandle;
+  DllPath: string;
+begin
+  // Obtener la ruta de la DLL
+  DllPath := GetProgramFilesPath + 'Consorcio de Tarjetas Dominicanas, S.A\ECRti.Framework.dll';
+  
+  // Intentar cargar la DLL
+  hLib := LoadLibrary(PChar(DllPath));
+  if hLib <> 0 then
+  begin
+    ShowMessage('DLL cargada correctamente desde: ' + DllPath);
+    FreeLibrary(hLib);
+  end
+  else
+    ShowMessage('No se pudo cargar la DLL desde: ' + DllPath);
+end;
+
+
 procedure TfrmTarjeta.FormCreate(Sender: TObject);
 begin
+//   LoadECRtiFramework;
   Facturo := 0;
   devolucion :=0;
 
@@ -171,7 +239,7 @@ WITH DM.Query1 do begin
 
   frmMain.vl_respverifone := '';
   end;
-end;
+end;     
 end;
 
 procedure TfrmTarjeta.FormKeyPress(Sender: TObject; var Key: Char);
@@ -237,8 +305,122 @@ begin
   frmMain.DisplayTotal;
 end;
 
-
 procedure TfrmTarjeta.btnPOSClick(Sender: TObject);
+var
+  ResponseMemo: String;
+  amount, tax, otherTaxes, quantyOfPayments: Integer;
+  tamount, ttax: Currency;
+  a: myJSONItem;
+  resultCode: Integer;  // Variable para almacenar el código convertido
+begin
+  try
+    btnPOS.Enabled := False;
+    ResponseMemo := '';
+
+    // Validar número de cuotas
+    if rgTipoVenta.ItemIndex = 0 then
+      quantyOfPayments := 0
+    else
+      quantyOfPayments := StrToIntDef(cbbCantCuotas.Text, 0);
+
+    // Validar impuesto
+    ttax := frmMain.QTicketitbis.Value;
+    if ttax < 0 then
+      ttax := 0;
+    tax := StrToIntDef(dm.QuitarPuntosDecimal(ttax), 0);
+
+    // Validar monto total
+    tamount := frmMain.QTickettotal.Value;
+    if tamount <= 0 then
+    begin
+      ShowMessage('Error: El monto total no puede ser 0 o negativo.');
+      btnPOS.Enabled := True;
+      Exit;
+    end;
+    amount := StrToIntDef(dm.QuitarPuntosDecimal(tamount), 0);
+    if amount <= 0 then
+    begin
+      ShowMessage('Error: No se pudo obtener un monto válido.');
+      btnPOS.Enabled := True;
+      Exit;
+    end;
+
+    // Configurar timeout
+    TimerPOS.Interval := 20000; // 20 segundos de espera
+    TimerPOS.Enabled := True;
+
+    // Inicializar comunicación con el dispositivo
+    result := core.Initialice();
+    resultCode := StrToIntDef(result, -1);  // Convertir a número (si no es válido, toma -1)
+
+    if resultCode <> 0 then
+    begin
+      ShowMessage('Error al inicializar el dispositivo de pago. Código: ' + IntToStr(resultCode ));
+      btnPOS.Enabled := True;
+      Exit;
+    end;
+
+    invoiceId := frmMain.QTicketticket.Value;
+    otherTaxes := 0;
+
+    // Procesar la transacción
+    case rgTipoVenta.ItemIndex of
+      0: response := core.ProcessNormalSale(amount, tax, otherTaxes, invoiceId);
+      1: response := core.ProcessDeferredSale(amount, tax, otherTaxes, invoiceId, quantyOfPayments);
+    end;
+
+    // Guardar en log
+    case rgTipoVenta.ItemIndex of
+      0: dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value, 1, dm.Usuario, invoiceId, response, 'N', 'T', amount, tax);
+      1: dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value, 1, dm.Usuario, invoiceId, response, 'O', 'T', amount, tax);
+    end;
+
+    // Si la respuesta llegó correctamente, detener el temporizador
+    TimerPOS.Enabled := False;
+
+    ResponseMemo := response;
+    frmMain.vl_respverifone := ResponseMemo;
+
+    // Validar respuesta
+    if Length(ResponseMemo) < 180 then
+    begin
+      ShowMessage('FAVOR REVISE LA CONEXION, FALLO LA TRANSACCION ' + Char(13) + ResponseMemo);
+      frmMain.vp_verifone := False;
+      btnPOS.Enabled := True;
+      edMonto.SetFocus;
+    end
+    else
+    begin
+      try
+        a := myJSONItem.Create;
+        a.Code := ResponseMemo;
+
+        if a.Has['Card'] and a.Has['Transaction'] then
+        begin
+          edtarjeta.Text := Copy(a['Card']['CardNumber'].getStr, Length(a['Card']['CardNumber'].getStr) - 3, Length(a['Card']['CardNumber'].getStr)) +
+                            ' / ' + a['Transaction']['AuthorizationNumber'].getStr;
+          frmMain.vp_verifone := True;
+          btimprimirClick(Sender);
+        end
+        else
+        begin
+          ShowMessage('Respuesta incompleta del dispositivo de pago.');
+          btnPOS.Enabled := True;
+        end;
+      finally
+        a.Free;
+      end;
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error: ' + E.ClassName + ' - ' + E.Message);
+      btnPOS.Enabled := True;
+    end;
+  end;
+end;
+
+{procedure TfrmTarjeta.btnPOSClick(Sender: TObject);
 var
 ResponseMemo : String;
 amount, tax, otherTaxes, quantyOfPayments : Integer;
@@ -314,11 +496,19 @@ try
   else
   begin
   frmMain.vp_verifone := True;
+   btimprimirClick(Sender);
   end;
 except
     on E : Exception do
       ShowMessage(E.ClassName+' error raised, with message : '+E.Message);
 end;
+end;     }
+
+procedure TfrmTarjeta.TimerPOSTimer(Sender: TObject);
+begin
+  TimerPOS.Enabled := False; // Desactivar el temporizador
+  ShowMessage('Tiempo de espera agotado. Verifique la conexión con el dispositivo.');
+  btnPOS.Enabled := True;
 end;
 
 end.

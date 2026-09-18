@@ -250,6 +250,7 @@ object frmDesgloce: TfrmDesgloce
     TitleFont.Name = 'Tahoma'
     TitleFont.Style = [fsBold]
     OnColEnter = DBGrid1ColEnter
+    OnColExit = DBGrid1ColExit
     OnEnter = DBGrid1Enter
     OnKeyPress = DBGrid1KeyPress
     Columns = <

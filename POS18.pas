@@ -26,6 +26,7 @@ type
     procedure DBGrid1ColEnter(Sender: TObject);
     procedure DBGrid1Enter(Sender: TObject);
     procedure DBGrid1KeyPress(Sender: TObject; var Key: Char);
+    procedure DBGrid1ColExit(Sender: TObject);
     procedure QMontosAfterInsert(DataSet: TDataSet);
     procedure QMontosBeforeDelete(DataSet: TDataSet);
     procedure FormCreate(Sender: TObject);
@@ -82,7 +83,20 @@ end;
 
 procedure TfrmDesgloce.DBGrid1KeyPress(Sender: TObject; var Key: Char);
 begin
-  if key = #13 then QMontos.Next;
+  if key = #13 then
+  begin
+    if QMontos.State in [dsEdit, dsInsert] then
+      QMontos.Post;
+    QMontos.Next;
+    totalizar;
+  end;
+end;
+
+procedure TfrmDesgloce.DBGrid1ColExit(Sender: TObject);
+begin
+  if QMontos.State in [dsEdit, dsInsert] then
+    QMontos.Post;
+  totalizar;
 end;
 
 procedure TfrmDesgloce.QMontosAfterInsert(DataSet: TDataSet);
@@ -98,6 +112,7 @@ end;
 procedure TfrmDesgloce.FormCreate(Sender: TObject);
 begin
   QMontos.Open;
+  totalizar;
 end;
 
 procedure TfrmDesgloce.btimprimirClick(Sender: TObject);
@@ -108,20 +123,32 @@ end;
 
 procedure TfrmDesgloce.totalizar;
 var
-  punt : tbookmark;
-  total : double;
+  punt: TBookmark;
+  total: Double;
 begin
   total := 0;
+  if QMontos.IsEmpty then
+  begin
+    lbtotal.Caption := FormatCurr('#,##0.00', 0);
+    Exit;
+  end;
+
   punt := QMontos.GetBookmark;
   QMontos.DisableControls;
-  QMontos.First;
-  while not QMontos.Eof do
-  begin
-    total := total + QMontosValor.Value;
-    QMontos.Next;
+  try
+    QMontos.First;
+    while not QMontos.Eof do
+    begin
+      total := total + QMontosValor.Value;
+      QMontos.Next;
+    end;
+    QMontos.GotoBookmark(punt);
+  finally
+    QMontos.FreeBookmark(punt);
+    QMontos.EnableControls;
   end;
-  QMontos.GotoBookmark(punt);
-  QMontos.EnableControls;
+
+  lbtotal.Caption := FormatCurr('#,##0.00', total);
 end;
 
 procedure TfrmDesgloce.QMontosAfterPost(DataSet: TDataSet);

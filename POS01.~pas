@@ -215,16 +215,28 @@ type
     QParametrospar_aplica_desc_por_rango_venta: TStringField;
     QQuery: TADOQuery;
     QParametrosPAR_CODIGO_ABRE_CAJA: TStringField;
+    QParametrospar_Marca_Printer: TStringField;
+    QParametrospar_puerto_Printer: TStringField;
+    QParametrospar_velocidad_Printer: TIntegerField;
+    QParametrosUsa_FacturacionElectronica: TBooleanField;
+    QParametrosImprimirCopia: TBooleanField;
+    QParametrosPAR_FE_DetenerFacturacion: TBooleanField;
+    QParametrospar_usa_huella_supervisor: TBooleanField;
     procedure ADOSIGMABeforeConnect(Sender: TObject);
     procedure DataModuleCreate(Sender: TObject);
+    procedure GrabaLogCardNet(emp, suc, usu, facticket:Integer;resultado, tipo, tipofacticket:String;monto,itbis:Double);
+    function RPad(pCadena: string; pLong: word; pRelleno: string = ' '): string;
+    function LPad(pCadena: string; pLong: word; pRelleno: string = ' '): string;
   private
 
     { Private declarations }
   public
     Usuario : integer;
-    NomUsuario : string;
+    NomUsuario, Puerto, Puerto2 : string;
     function  Centro (Texto : String) : String;
+    function CentroModifed (Texto : String) : String;
     function getFechaServidor: TDatetime;
+    function getFechaServidor2: TDatetime;
     function validaSerie(vPro_codigo,vSer_numero: string):boolean;
     procedure Imp40Columnas(const vARCH: TextFile);
     Function FillSpaces(cVar:String;nLen:Integer):String;
@@ -232,12 +244,16 @@ type
     Function FillSpacesLeft(cVar:String;nLen:Integer):String;
     Function GetIPAddress():String;
     function QuitarPuntosDecimal(Value:Double):String ;
+    function PAD(Mchar, Alineacion: char; tamano: Integer;Numero: String): string;
+    function getParametrosPrinterFiscal: String;
 
   end;
 
 var
-  DM: TDM;
-
+   DM: TDM;
+  Impresora :TImpresora;
+  PCNombre,IP :String;
+  dirTmp:String;
 implementation
 
 uses printers;
@@ -248,7 +264,6 @@ uses printers;
 
 function TDM.getFechaServidor():TDatetime ;
 begin
-  result := now;
   with dm.adoMultiUso do begin
     Close;
     Sql.clear;
@@ -257,6 +272,19 @@ begin
     if not IsEmpty then
       Result :=dm.adoMultiUso['fecha'];
   end;
+end;
+
+function TDM.CentroModifed(Texto: String): String;
+var
+  a : integer;
+  l : String;
+begin
+  l := '';
+  for a := 1 to Trunc((38 - length(trim(texto))) / 2) do
+  begin
+    l := l + ' ';
+  end;
+  Result := l + trim(texto);
 end;
 
 function TDM.Centro(Texto: String): String;
@@ -277,7 +305,7 @@ var
   ar : textfile;
   db : string;
 begin
-  assignfile(ar, 'dashasql.ini');
+  assignfile(ar, '.\dashasql.ini');
   reset(ar);
   read(ar, db);
   db := db + ';User ID=randy;password=dayelcris';
@@ -326,7 +354,6 @@ end;
 procedure TDM.Imp40Columnas(const vARCH: TextFile);
 var puertopeq,
     Prn       : textfile;
-    puerto,
     text      : string;
     pr        : TPrinter;
 begin
@@ -408,6 +435,169 @@ begin
   ParteDecimal:= copy(ValorDoubleTxt,pos('.',ValorDoubleTxt)+1,length(ValorDoubleTxt));
   result :=  ParteEntera+ParteDecimal;
 
+end;
+
+function TDM.getFechaServidor2: TDatetime;
+begin
+  with dm.adoMultiUso do begin
+    Close;
+    Sql.clear;
+    sql.add('SELECT GETDATE() FECHA');
+    open;
+    if not IsEmpty then
+      Result :=dm.adoMultiUso['FECHA'];
+  end;
+
+end;
+
+function TDM.PAD(Mchar, Alineacion: char; tamano: Integer;
+  Numero: String): string;
+{**-[Esta funciùn es para rellenar una cadena con un valor recibido a un
+     tamaùo dado recibe como parùmetro lo sigte :
+     Mchar:Es un carater cualquiera.
+     Tamaùo :Es el tamaùo al cual sera combertida la cadena
+     Nùmero :Es la cadena enviada
+     Tiene como resultado una cadena con el tamaùo dado < S >  ]-**}
+
+var S:String;
+begin
+  ///Numero :=Copy(aCero,1,(Tamano - Length(Trim(Numero))))+Numero;
+
+  Alineacion :=UpCase(Alineacion);
+  S:=Numero;
+  while Length(S) < Tamano do begin
+    if Alineacion = 'L' then
+      S:=Mchar+S
+    else if Alineacion = 'R' then
+      S:=S+Mchar
+    else if Alineacion = 'C' then
+      S:=S;
+  end;
+
+  Result:=S;
+
+end;
+
+function TDM.getParametrosPrinterFiscal: String;
+begin
+  ///if not Assigned(Impresora) then
+    Impresora:=TImpresora.create(nil);
+
+  With dm.adoMultiUso do begin
+    Close;
+    Sql.clear();
+    sql.add('Select pc.nombre_pc,pc.idPrinter,pc.Puerto,pc.Velocidad,');
+    sql.Add('       pc.cntCopia,pr.Nombre,pr.Tipo,pr.Precioconitbis, pc.sustiruir_copia ');
+    sql.Add('From Printer_en_PC pc , Printers pr ');
+    sql.Add('Where pc.idPrinter = pr.IDPrinter');
+    sql.add('And ((pc.nombre_pc = :nombrepc) or (pc.nombre_pc = :ip)) ');
+    Parameters.ParamByName('nombrepc').value := GetCompName;;
+    Parameters.ParamByName('ip').value := GetIPAddress;;
+    open;
+    if not IsEmpty then
+      begin //1
+        With Impresora do begin
+          NombrePC  := dm.adoMultiUso['nombre_pc'];
+          IDPrinter := dm.adoMultiUso['idPrinter'];
+          Nombre    := dm.adoMultiUso['Nombre'];
+          Puerto    := StrToInt(copy(dm.adoMultiUso['Puerto'],4,length(dm.adoMultiUso['Puerto']) ));
+          Velocidad := dm.adoMultiUso['Velocidad'];
+          Tipo      := dm.adoMultiUso['Tipo'];
+          Precioconitbis := dm.adoMultiUso['Precioconitbis'];
+          Copia     := dm.adoMultiUso['cntCopia'];
+          esFiscal  := true;
+          SustituirCopia :=  dm.adoMultiUso['sustiruir_copia'] = 'True';
+        end;
+      end // 1
+    else
+      begin   //2
+        if not QParametrospar_Marca_Printer.IsNull then
+          begin //--[2.1]--
+          if Trim(QParametrospar_Marca_Printer.AsString) <> '' then
+          begin
+            Close;
+            Sql.clear();
+            sql.add('Select IDPrinter,Nombre,Tipo,Precioconitbis From Printers');
+				    sql.add('Where IDPrinter = :ID ');
+            Parameters.ParamByName('ID').value := dm.QParametrospar_Marca_Printer.Value;
+
+            open;
+            if not IsEmpty then begin  //--[2.1.1]--
+              With Impresora do begin
+                IDPrinter := 0;//dm.adoMultiUso['idPrinter'];
+                Nombre := dm.adoMultiUso['Nombre'];
+                Tipo      := dm.adoMultiUso['Tipo'];
+                Precioconitbis := dm.adoMultiUso['Precioconitbis'];
+                Copia     := 0; //dm.adoMultiUso['cntCopia'];
+                esFiscal  := true;
+
+                if not dm.QParametrospar_puerto_Printer.IsNull then
+                  Puerto := StrToInt(Copy(dm.QParametrospar_puerto_Printer.value,4,1));
+                if not dm.QParametrospar_velocidad_Printer.IsNull then
+                  Velocidad := dm.QParametrospar_velocidad_Printer.value ;
+              end;
+            end; //--[2.1.1]--
+          end;
+          end; //--[2.1]--
+
+        end; //2
+      end;
+
+end;
+
+procedure TDM.GrabaLogCardNet(emp, suc, usu, facticket:Integer;resultado, tipo, tipofacticket:String;monto,itbis:Double);
+begin
+with adoMultiUso do begin
+  Close;
+  SQL.Clear;
+  SQL.Add('INSERT INTO adLogVeriphone');
+  SQL.Add('select :emp, :suc, :usu, getdate(), :tipo, :monto, :itbis, :num, :tipofacticket, :result');
+  Parameters.ParamByName('emp').DataType    := ftInteger;
+  Parameters.ParamByName('suc').DataType    := ftInteger;
+  Parameters.ParamByName('usu').DataType    := ftInteger;
+  Parameters.ParamByName('tipo').DataType   := ftString;
+  Parameters.ParamByName('monto').DataType  := ftCurrency;
+  Parameters.ParamByName('itbis').DataType  := ftCurrency;
+  Parameters.ParamByName('num').DataType    := ftInteger;
+  Parameters.ParamByName('tipofacticket').DataType := ftString;
+  Parameters.ParamByName('result').DataType := ftString;
+  Parameters.ParamByName('emp').Value       := emp;
+  Parameters.ParamByName('suc').Value       := suc;
+  Parameters.ParamByName('usu').Value       := usu;
+  Parameters.ParamByName('tipo').Value      := tipo;
+  Parameters.ParamByName('monto').Value     := monto;
+  Parameters.ParamByName('itbis').Value     := itbis;
+  Parameters.ParamByName('num').Value       := facticket;
+  Parameters.ParamByName('tipofacticket').Value := tipofacticket;
+  Parameters.ParamByName('result').Value    := resultado;
+  ExecSQL;
+end;
+end;
+
+function TDM.RPad(pCadena: string; pLong: word; pRelleno: string): string;
+begin
+{Inicializaciùn}
+result := pCadena;
+
+while Length(result) < pLong do
+result := result + pRelleno;
+
+{Como el resultado podrùa tener mùs de "pLong" caracteres, lo recortamos.}
+if Length(pCadena) <= pLong then
+result := Copy(result, 1, pLong);
+end;
+
+function TDM.LPad(pCadena: string; pLong: word; pRelleno: string): string;
+begin
+{Inicializaciùn}
+result := pCadena;
+
+while Length(result) < pLong do
+result := pRelleno + result;
+
+{Como el resultado podrùa tener mùs de "pLong" caracteres, lo recortamos.}
+if Length(pCadena) <= pLong then
+result := Copy(result, 1, pLong);
 end;
 
 end.

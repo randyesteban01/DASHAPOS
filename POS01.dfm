@@ -1,8 +1,8 @@
 object DM: TDM
   OldCreateOrder = False
   OnCreate = DataModuleCreate
-  Left = 668
-  Top = 627
+  Left = 1516
+  Top = 655
   Height = 283
   Width = 323
   object ADOSIGMA: TADOConnection
@@ -823,6 +823,18 @@ object DM: TDM
     end
     object QParametrospar_velocidad_Printer: TIntegerField
       FieldName = 'par_velocidad_Printer'
+    end
+    object QParametrosUsa_FacturacionElectronica: TBooleanField
+      FieldName = 'Usa_FacturacionElectronica'
+    end
+    object QParametrosImprimirCopia: TBooleanField
+      FieldName = 'ImprimirCopia'
+    end
+    object QParametrosPAR_FE_DetenerFacturacion: TBooleanField
+      FieldName = 'PAR_FE_DetenerFacturacion'
+    end
+    object QParametrospar_usa_huella_supervisor: TBooleanField
+      FieldName = 'par_usa_huella_supervisor'
     end
   end
   object adoMultiUsoII: TADOQuery

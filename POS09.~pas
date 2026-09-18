@@ -69,7 +69,7 @@ end;
 
 procedure TfrmBuscaProducto.QProductosCalcFields(DataSet: TDataSet);
 begin
-  if ((Precio='') or (Precio='Ninguno') or VarIsNull(Precio)) then
+  if ((Precio='') or (Precio='Ninguno') or VarIsNull(Precio) then
  //if (Precio = '') or VarIsNull(Precio) then
   Precio := 'Precio1';       
   if Precio = 'Precio1' then

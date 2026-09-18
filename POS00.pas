@@ -25,7 +25,7 @@ uses
   DIMime, DateUtils, OleCtrls,  Math, jpeg, Mask, DBCtrls,
   QuerySearchDlgADO, IdBaseComponent, IdComponent, IdIPWatch, dxmdaset,
   IBCustomDataSet, ActnList, OposScale_CCO_TLB, OposScanner_CCO_TLB,
-  uJSON, OCXFISLib_TLB, vmaxFiscal, iFiscal, Tfhkaif;
+  uJSON, OCXFISLib_TLB, vmaxFiscal, iFiscal, Tfhkaif,DelphiZXingQRCode;
 
 
 const
@@ -357,6 +357,12 @@ type
     QFormaPagoemp_codigo: TIntegerField;
     QFormaPagosuc_codigo: TIntegerField;
     QTicketsuc_codigo: TIntegerField;
+    ConsExistencia: TADOQuery;
+    ConstAlmacen: TADOQuery;
+    ScanTimer: TTimer;
+    QTicketTipoeNCF: TIntegerField;
+    QTicketemp_rnc: TStringField;
+    QTicketeNCF: TStringField;
     procedure pnsalirClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
@@ -427,13 +433,12 @@ type
     procedure tmVerificaPuertoTimer(Sender: TObject);
     procedure qDetalleNewRecord(DataSet: TDataSet);
     procedure QFormaPagoNewRecord(DataSet: TDataSet);
-
-
-
+    procedure ScanTimerTimer(Sender: TObject);
 
   private
       Pregunta : String;
       TipoLector : Integer;
+      permitenegativo: Boolean;
 
       puedeAbrirCaja:boolean;
     puertoFiscalOpen:boolean;
@@ -463,6 +468,13 @@ type
 
     function GetProducto:Integer;
     function getPrinterFiscalBixolonStatus: boolean;
+    function IsStrANumber(const S: string): Boolean;
+    function NormalizarRNC(const ARNC: string): string;
+    function JsonGetString(const AJson, ACampo: string): string;
+    function JsonBooleanTrue(const AJson, ACampo: string): Boolean;
+    function ExtraerNombreDirectorio(const AJson: string): string;
+    function BuscarRNCEnDashaODGII(const ARNC: string; out ANombre: string;
+      AMostrarMensaje: Boolean): Boolean;
     { Private declarations }
   public
     SelCajero, SelCondi, facturar : boolean;
@@ -486,12 +498,13 @@ type
     vl_respverifone, vl_tarjeta, Puerto2 : string;
     Debitos, Creditos : Double;
     Vendedor_Asociado_a_Clte :boolean ;
-    procedure BuscaProducto(producto : string);
+    procedure BuscaProducto(producto : string; porcodigo:Boolean);
     procedure BuscaProducto2(producto : string);
     procedure Totaliza;
     procedure TicketNuevo(const default:boolean = false);
     procedure InsertaProducto;
     procedure ImpTicket;
+    procedure ImpTicketReport;
     procedure ImpTicketRifa;
     procedure ImpTicketNorma201806;
 //    Procedure ImpTicketFiscal;
@@ -514,6 +527,13 @@ type
     procedure ImpTicketFiscalBixolon(ImpresoraFiscal:TImpresora);
     function getPregunta_x_Impresion(value: String): boolean;
     procedure OpenCashDrawerFiscal(vPrinterFiscal:TImpresora);
+
+     function ValidarENCFDisponible(
+      AEmp: Integer; ATipo: Integer;
+      out AMsg: string;
+      out ASiguienteCorrelativo: Int64
+    ): Boolean;
+    
   end;
 
 var
@@ -533,7 +553,8 @@ implementation
 
 uses POS01, POS03, POS04, POS05, POS06, POS07, POS08, POS09, POS10, POS11,
   POS12, POS13, POS14, POS15, POS16, POS17, POS19, POS20, POS18, POS21,
-  POS24, POS25, POS22, PVENTA185, POS27, CurrEdit;
+  POS24, POS25, POS22, PVENTA185, POS27, CurrEdit, ComObj,
+  FacturacionElectronicaDGII_TLB;
 
 {$R *.dfm}
 
@@ -562,6 +583,309 @@ function IntToBinRec(valor,digitos:integer):string;
     result:='0'+IntToBinRec(valor,digitos-1)
   end;
 end;
+
+function PosDesde(const SubStr, S: string; Offset: Integer): Integer;
+var
+  I, LSub, LS: Integer;
+begin
+  Result := 0;
+  LSub := Length(SubStr);
+  LS := Length(S);
+  if (LSub = 0) or (Offset < 1) or (Offset > LS) then
+    Exit;
+
+  for I := Offset to LS - LSub + 1 do
+    if Copy(S, I, LSub) = SubStr then
+    begin
+      Result := I;
+      Exit;
+    end;
+end;
+
+function TfrmMain.NormalizarRNC(const ARNC: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to Length(ARNC) do
+    if ARNC[I] in ['0'..'9'] then
+      Result := Result + ARNC[I];
+end;
+
+function TfrmMain.JsonGetString(const AJson, ACampo: string): string;
+var
+  JsonLower, Campo: string;
+  P, I, Inicio: Integer;
+  Ch: Char;
+  Escapado: Boolean;
+begin
+  Result := '';
+  JsonLower := LowerCase(AJson);
+  Campo := '"' + LowerCase(ACampo) + '"';
+  P := Pos(Campo, JsonLower);
+  if P = 0 then
+    Exit;
+
+  P := PosDesde(':', AJson, P + Length(Campo));
+  if P = 0 then
+    Exit;
+
+  Inc(P);
+  while (P <= Length(AJson)) and (AJson[P] in [' ', #9, #10, #13]) do
+    Inc(P);
+
+  if (P > Length(AJson)) or (AJson[P] <> '"') then
+    Exit;
+
+  Inicio := P + 1;
+  I := Inicio;
+  Escapado := False;
+  while I <= Length(AJson) do
+  begin
+    Ch := AJson[I];
+    if Escapado then
+      Escapado := False
+    else if Ch = '\' then
+      Escapado := True
+    else if Ch = '"' then
+    begin
+      Result := Copy(AJson, Inicio, I - Inicio);
+      Result := StringReplace(Result, '\"', '"', [rfReplaceAll]);
+      Result := StringReplace(Result, '\\', '\', [rfReplaceAll]);
+      Result := StringReplace(Result, '\/', '/', [rfReplaceAll]);
+      Exit;
+    end;
+    Inc(I);
+  end;
+end;
+
+function TfrmMain.JsonBooleanTrue(const AJson, ACampo: string): Boolean;
+var
+  S: string;
+begin
+  S := LowerCase(AJson);
+  S := StringReplace(S, ' ', '', [rfReplaceAll]);
+  S := StringReplace(S, #9, '', [rfReplaceAll]);
+  S := StringReplace(S, #10, '', [rfReplaceAll]);
+  S := StringReplace(S, #13, '', [rfReplaceAll]);
+  Result := Pos('"' + LowerCase(ACampo) + '":true', S) > 0;
+end;
+
+function TfrmMain.ExtraerNombreDirectorio(const AJson: string): string;
+begin
+  Result := Trim(JsonGetString(AJson, 'nombre'));
+  if Result <> '' then
+    Exit;
+
+  Result := Trim(JsonGetString(AJson, 'razonSocial'));
+  if Result <> '' then
+    Exit;
+
+  Result := Trim(JsonGetString(AJson, 'razon_social'));
+  if Result <> '' then
+    Exit;
+
+  Result := Trim(JsonGetString(AJson, 'razonSocialComprador'));
+  if Result <> '' then
+    Exit;
+
+  Result := '';
+end;
+
+function TfrmMain.BuscarRNCEnDashaODGII(const ARNC: string; out ANombre: string;
+  AMostrarMensaje: Boolean): Boolean;
+var
+  RNCNorm, ResJSON, Mensaje, RNCEmpresa, EmpCodigo: string;
+  Servicio: OleVariant;
+  RNCExiste: Boolean;
+  LogDGII: TextFile;
+begin
+  Result := False;
+  ANombre := '';
+  RNCNorm := NormalizarRNC(ARNC);
+  RNCExiste := False;
+
+  if Length(RNCNorm) < 9 then
+  begin
+    if AMostrarMensaje then
+      MessageDlg('DEBE DIGITAR UN RNC VALIDO, PRESIONE [ENTER] PARA SALIR',
+        mtError, [mbok], 0);
+    Exit;
+  end;
+
+  dm.Query1.Close;
+  dm.Query1.SQL.Clear;
+  dm.Query1.SQL.Add('select razon_social from rnc');
+  dm.Query1.SQL.Add('where rnc_cedula = :rnc');
+  dm.Query1.Parameters.ParamByName('rnc').Value := RNCNorm;
+  dm.Query1.Open;
+  if dm.Query1.RecordCount > 0 then
+  begin
+    RNCExiste := True;
+    ANombre := dm.Query1.FieldByName('razon_social').AsString;
+    if Trim(ANombre) <> '' then
+    begin
+      Result := True;
+      dm.Query1.Close;
+      Exit;
+    end;
+  end;
+  dm.Query1.Close;
+
+  try
+    RNCEmpresa := '';
+    if dm.QEmpresa.Active and (not dm.QEmpresaemp_rnc.IsNull) then
+      RNCEmpresa := dm.QEmpresaemp_rnc.AsString;
+
+    EmpCodigo := '';
+    if QTicket.Active and (not QTicketemp_codigo.IsNull) then
+      EmpCodigo := IntToStr(QTicketemp_codigo.Value)
+    else if dm.QEmpresa.Active then
+      EmpCodigo := IntToStr(dm.QEmpresaEMP_CODIGO.Value);
+
+    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
+    ResJSON := Servicio.ConsultarDirectorioPorRnc(
+      RNCNorm, '', RNCEmpresa, '', '', '', EmpCodigo);
+
+    AssignFile(LogDGII, '.\ConsultaRNC_DGII.log');
+    if FileExists('.\ConsultaRNC_DGII.log') then
+      Append(LogDGII)
+    else
+      Rewrite(LogDGII);
+    Writeln(LogDGII, 'Fecha=' + DateTimeToStr(Now) + ' RNC=' + RNCNorm +
+      ' Empresa=' + EmpCodigo);
+    Writeln(LogDGII, ResJSON);
+    Writeln(LogDGII, '----------------------------------------');
+    CloseFile(LogDGII);
+
+    ANombre := ExtraerNombreDirectorio(ResJSON);
+    Mensaje := Trim(JsonGetString(ResJSON, 'message'));
+
+    if JsonBooleanTrue(ResJSON, 'encontrado') and (Trim(ANombre) <> '') then
+    begin
+      dm.Query1.Close;
+      dm.Query1.SQL.Clear;
+      if RNCExiste then
+      begin
+        dm.Query1.SQL.Add('update rnc');
+        dm.Query1.SQL.Add('set razon_social = :razon,');
+        dm.Query1.SQL.Add('nombre_comercial = :nombre');
+        dm.Query1.SQL.Add('where rnc_cedula = :rnc');
+        dm.Query1.Parameters.ParamByName('razon').Value := ANombre;
+        dm.Query1.Parameters.ParamByName('nombre').Value := ANombre;
+        dm.Query1.Parameters.ParamByName('rnc').Value := RNCNorm;
+      end
+      else
+      begin
+        dm.Query1.SQL.Add('insert into rnc');
+        dm.Query1.SQL.Add('(rnc_cedula, razon_social, nombre_comercial,');
+        dm.Query1.SQL.Add('actividad_economica, direccion, numero, urbanizacion,');
+        dm.Query1.SQL.Add('telefono, estatus)');
+        dm.Query1.SQL.Add('values (:rnc, :razon, :nombre,');
+        dm.Query1.SQL.Add(':actividad, :direccion, :numero, :urbanizacion,');
+        dm.Query1.SQL.Add(':telefono, :estatus)');
+        dm.Query1.Parameters.ParamByName('rnc').Value := RNCNorm;
+        dm.Query1.Parameters.ParamByName('razon').Value := ANombre;
+        dm.Query1.Parameters.ParamByName('nombre').Value := ANombre;
+        dm.Query1.Parameters.ParamByName('actividad').Value := '';
+        dm.Query1.Parameters.ParamByName('direccion').Value := '';
+        dm.Query1.Parameters.ParamByName('numero').Value := '';
+        dm.Query1.Parameters.ParamByName('urbanizacion').Value := '';
+        dm.Query1.Parameters.ParamByName('telefono').Value := '';
+        dm.Query1.Parameters.ParamByName('estatus').Value := 'ACT';
+      end;
+      dm.Query1.ExecSQL;
+
+      Result := True;
+    end
+    else if AMostrarMensaje then
+    begin
+      if Mensaje = '' then
+        Mensaje := 'EL CLIENTE NO EXISTE';
+      MessageDlg(Mensaje + ', PRESIONE [ENTER] PARA SALIR',
+        mtError, [mbok], 0);
+    end;
+  except
+    on E: Exception do
+      if AMostrarMensaje then
+        MessageDlg('Consulta DGII: ' + E.Message, mtError, [mbok], 0);
+  end;
+end;
+
+function TfrmMain.ValidarENCFDisponible(
+  AEmp: Integer; ATipo: Integer;
+  out AMsg: string;
+  out ASiguienteCorrelativo: Int64  // opcional, informativo
+): Boolean;
+var
+  Q: TADOQuery;
+  desde, ultima, cantidad, hasta, siguiente: Int64;
+  vence: TDateTime;
+  activa: Boolean;
+begin
+  Result := False;
+  AMsg := '';
+  ASiguienteCorrelativo := 0;
+
+  Q := dm.Query1; // reutiliza tu query
+  Q.Close;
+  Q.SQL.Clear;
+  Q.SQL.Add('SELECT s.Secuencia_Inicial_DGII, s.Ultima_secuencia_DGII, ');
+  Q.SQL.Add('     CONVERT(datetime, s.FechaVencimientoSecuenciaDGII, 120) AS FechaVencimientoSecuenciaDGII, s.Activa, s.Cantidad');
+  Q.SQL.Add('FROM SecuenciaDGII s');
+  Q.SQL.Add('JOIN TipoNCF t ON t.emp_codigo = s.emp_codigo AND s.Tipo = t.cod_dgii');
+  Q.SQL.Add('WHERE s.emp_codigo = :emp AND t.tip_codigo = :tip');
+  Q.Parameters.ParamByName('emp').Value := AEmp;
+  Q.Parameters.ParamByName('tip').Value := ATipo;
+
+  Q.Open;
+
+  if Q.Eof then
+  begin
+    AMsg := 'SECUENCIA_NO_CONFIGURADA';
+    Exit;
+  end;
+
+  desde    := Q.FieldByName('Secuencia_Inicial_DGII').AsInteger;
+  ultima   := Q.FieldByName('Ultima_secuencia_DGII').AsInteger;
+  cantidad := Q.FieldByName('Cantidad').AsInteger;
+
+  if not Q.FieldByName('FechaVencimientoSecuenciaDGII').IsNull then
+  begin
+    vence := Q.FieldByName('FechaVencimientoSecuenciaDGII').AsDateTime;
+    if Now > vence then
+    begin
+      AMsg := 'La secuencia esta vencida.';
+      Exit;
+    end;
+  end;
+
+
+  if not Q.FieldByName('Activa').IsNull then
+  activa := Q.FieldByName('Activa').AsBoolean
+  else
+    activa := False; // por defecto
+
+  hasta     := desde + cantidad - 1;
+  siguiente := ultima + 1;
+
+  if activa = False then
+  begin
+    AMsg := 'SECUENCIA_INACTIVA';
+    Exit;
+  end;
+
+  if siguiente > hasta then
+  begin
+    AMsg := 'SECUENCIA_AGOTADA';
+    Exit;
+  end;
+
+  // Hay secuencia vï¿½lida y disponible (sin reservar)
+  ASiguienteCorrelativo := siguiente;
+  Result := True;
+end;
+
 
 procedure TfrmMain.setValoresDefault();
 begin
@@ -678,7 +1002,7 @@ Begin
   {LongDayNames[01]     := 'Domingo';
   LongDayNames[02]     := 'Lunes';
   LongDayNames[03]     := 'Martes';
-  LongDayNames[04]     := 'Miércoles';
+  LongDayNames[04]     := 'Miï¿½rcoles';
   LongDayNames[05]     := 'Jueves';
   LongDayNames[06]     := 'Viernes';
   LongDayNames[07]     := 'Sabado';
@@ -919,7 +1243,10 @@ begin
   lbitbis.Caption    := format('%n',[Itbis]);
   lbtotal.Caption    := format('%n',[Total]);
 
-  QTicket.Edit;
+  if not QTicket.Active or QTicket.IsEmpty then
+    Exit;
+  if not (QTicket.State in [dsEdit, dsInsert]) then
+    QTicket.Edit;
   QTickettotal.Value := Total;
   QTicketitbis.Value := StrToFloat(format('%10.4F',[Itbis]));
   QTicketdescuento.Value := Descuento;
@@ -972,7 +1299,7 @@ begin
     DM.Query1.Close;
   DM.Query1.SQL.Clear;
   DM.Query1.SQL.Add('select * from montos_ticket where status = ''ABI'' AND USU_CODIGO = '+IntToStr(dm.Usuario));
-  DM.Query1.SQL.Add('AND FECHA BETWEEN CAST(CAST(GETDATE() AS CHAR(11)) AS DATETIME) AND GETDATE()');
+  DM.Query1.SQL.Add('AND FECHA BETWEEN CAST(CAST(GETDATE() AS CHAR(11)) AS DATETIME) AND GETDATE() and total>0');
   DM.Query1.OPEN;
   if DM.Query1.RecordCount > 0 then
   begin
@@ -1020,7 +1347,7 @@ begin
   if ((Sem <> 0) and (GetLastError = ERROR_ALREADY_EXISTS)) then
   begin
     CloseHandle( Sem );
-    ShowMessage('Este programa ya se está ejecutando...');
+    ShowMessage('Este programa ya se esta ejecutando...');
     Halt;
   end;
   edcaja.Caption :='0';
@@ -1033,7 +1360,7 @@ begin
   Clientes:=TClientes.Create(self);
   dm.QEmpresa.Open;
 
-  //verificando el código del RNC
+  //verificando el cï¿½digo del RNC
   if Trim(MimeEncodeString(dm.QEmpresaemp_rnc.AsString)) <> dm.QEmpresacode_rnc.AsString then
     begin
       MessageDlg('USTED NO TIENE AUTORIZACION PARA UTILIZAR ESTE SISTEMA,'+#13+
@@ -1399,7 +1726,7 @@ end;
 
 
 
-procedure TfrmMain.BuscaProducto(producto: string);
+procedure TfrmMain.BuscaProducto(producto: string; porcodigo:Boolean );
 var
   Valor, Decimal, FormaTicketPeso, Cant : String;
   digitos, digitos_entero, digitos_decimal : integer;
@@ -1424,13 +1751,24 @@ begin
  // DM.Query1.SQL.Add('pro_precio2 pro_precio1,');
   DM.Query1.SQL.Add('pro_precio1,');
   dm.Query1.SQL.Add('pro_existencia, pro_itbis, pro_precio3, pro_precio4, pro_patrocinador, pro_cantempaque, pro_existempaque, pro_costoempaque, isnull(pro_detallado,''False'') Detallado from productos');
+if not (porcodigo) then
+begin
   if primercampo = 'L' then
-    dm.Query1.SQL.Add('where pro_roriginal like '+QuotedStr('%'+edproducto.Text))
+    dm.Query1.SQL.Add('where pro_roriginal like ' + QuotedStr('%' + edproducto.Text))
   else
   begin
     dm.Query1.SQL.Add('where pro_roriginal = :pro');
     dm.Query1.Parameters.ParamByName('pro').Value := producto;
   end;
+end
+else
+begin
+  
+  dm.Query1.SQL.Add('where pro_codigo = :pro');
+  dm.Query1.Parameters.ParamByName('pro').Value := producto;
+end;
+
+
   dm.Query1.SQL.Add('and emp_codigo = :emp and pro_status = '+QuotedStr('ACT'));
   dm.Query1.Parameters.ParamByName('emp').Value := empresainv;
   dm.Query1.Open;
@@ -1612,12 +1950,70 @@ procedure TfrmMain.edproductoKeyPress(Sender: TObject; var Key: Char);
 var
   Prec : string;
   digitos : Integer;
+
 begin
+  // Reinicia el temporizador en cada entrada de carï¿½cter
+  {ScanTimer.Enabled := False;
+  ScanTimer.Enabled := True;  }
+
 if ((key = #13) and (Sender = edproducto)) then
   begin
     Precio := 0;
-    BuscaProducto(edproducto.Text);
-    if trim(edproducto.Text) = '' then edproducto.Text := 'VARIOS';
+    BuscaProducto(edproducto.Text, False);
+
+    if (edproducto.Text <> '') then
+    begin
+    //Se verifica si este almacen permite facturar sin existencia
+      ConstAlmacen.Close;
+      ConstAlmacen.SQL.Clear;
+      ConstAlmacen.SQL.Add('select * from Almacen');
+      ConstAlmacen.SQL.Add('where alm_codigo = :alm_codigo');
+      ConstAlmacen.SQL.Add(' and emp_codigo = :emp_codigo');
+      ConstAlmacen.SQL.Add(' and alm_existneg = :alm_existneg');
+      ConstAlmacen.Parameters.ParamByName('alm_codigo').Value := almacen;
+      ConstAlmacen.Parameters.ParamByName('emp_codigo').Value := empresainv;
+      ConstAlmacen.Parameters.ParamByName('alm_existneg').Value := 'False';
+      ConstAlmacen.Open;
+
+      if ConstAlmacen.RecordCount > 0 then
+      begin
+      permitenegativo:=false end
+      else
+       permitenegativo:=true;
+
+       if (dm.Query1.FieldByName('pro_codigo').AsString<>'') then
+       begin
+       //Si no permite negativos verificamos que el producto tenga existencia
+      if (not permitenegativo) then
+      begin
+
+        ConsExistencia.Close;
+        ConsExistencia.SQL.Clear;
+        ConsExistencia.SQL.Add('select exi_cantidad  from Existencias');
+        ConsExistencia.SQL.Add('where alm_codigo = :alm_codigo');
+        ConsExistencia.SQL.Add(' and emp_codigo = :emp_codigo');
+        ConsExistencia.SQL.Add(' and pro_codigo = :pro_codigo');
+        ConsExistencia.SQL.Add(' and exi_cantidad<=0');
+        ConsExistencia.Parameters.ParamByName('alm_codigo').Value := almacen;
+        ConsExistencia.Parameters.ParamByName('emp_codigo').Value := empresainv;
+        ConsExistencia.Parameters.ParamByName('pro_codigo').Value := dm.Query1.FieldByName('pro_codigo').AsString;
+        ConsExistencia.Open;
+
+        if (ConsExistencia.RecordCount > 0 ) then
+        begin
+          if (ConsExistencia.FieldByName('exi_cantidad').AsFloat<=0) then
+          begin
+            MessageDlg('ESTE PRODUCTO NO TIENE EXISTENCIA, NO ES POSIBLE FACTURARLO!',mtError,[mbok],0);
+            edproducto.Text := '' ;
+            edproducto.SetFocus;
+            Exit;
+          end;
+        end;
+        end;
+      end;
+      end;
+
+       if trim(edproducto.Text) = '' then edproducto.Text := 'VARIOS';
      //Prec := InputBox('Precio','Precio','');
         if trim(Prec) <> '' then
         begin
@@ -1627,7 +2023,7 @@ if ((key = #13) and (Sender = edproducto)) then
         end
         else
           edproducto.Text := '';
-
+          
     //UltProd := edproducto.Text;
 
     //BuscaProducto(edproducto.Text);
@@ -1850,6 +2246,12 @@ end;
 procedure TfrmMain.pnefectivoClick(Sender: TObject);
 var
   ncf_fijo : string;
+  prox: Int64;
+  Servicio: FacturaElectronicaService;
+  resultado: WideString;
+  ok: Boolean;
+  msg: string;
+
 begin
 //VerificarVentasInespre;
 //VerificarMasUnCombo;
@@ -1882,6 +2284,20 @@ begin
 
       TipoComprobante := QTickettip_codigo.Value;
 
+      if  (dm.QParametrosUsa_FacturacionElectronica.Value and dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+          begin
+                // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+                Exit;
+              end;
+          end;
       //buscando la empresa que tiene la caja en ese momento
         dm.Query1.Close;
         dm.Query1.SQL.Clear;
@@ -1958,6 +2374,7 @@ begin
       begin
         Boletos;
         QTicket.Edit;
+        
         QTicketBoletos.Value  := CantBoletos;
         QTicketNCF_Tipo.Value := TipoComprobante;
         QTicketstatus.Value   := 'FAC';
@@ -2032,6 +2449,7 @@ begin
         if QTicket.State in [dsinsert, dsedit] then begin
         QTicket.Post;
        QTicket.UpdateBatch;
+       
        end;
 
 //Serie fernando
@@ -2128,9 +2546,9 @@ end;
           Query1.ExecSQL;
         end;
 
-        if Puerto2 = 'E'  then
+        {if Puerto2 = 'E'  then
         pnabrircaja2;
-        if Puerto2 = 'T'  then
+        if Puerto2 = 'T'  then   }
         pnabrircaja2;
 
         Application.CreateForm(tfrmDevuelta, frmDevuelta);
@@ -2142,17 +2560,136 @@ end;
         frmDevuelta.Release;
         end;
 
+         //Enviar a la DGII
+         if  (dm.QParametrosUsa_FacturacionElectronica.Value)  then
+          begin
+               if  (dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+               begin
+               // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+               end else ok:=True;  
 
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+              end;
+
+              if (ok)  then
+              begin
+
+               dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('UPDATE Montos_Ticket');
+                  dm.Query1.sql.add('SET Enviado_DGII=1');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  
+             //Proceso para enviar la Facturacion Electronica DGII
+
+                try
+                  QTicket.Edit;
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select emp_rnc');
+                  dm.Query1.sql.add('from empresas');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.Parameters.parambyname('emp').Value  := empcomprobante;
+                  dm.Query1.open;
+                  QTicketemp_rnc.value := dm.Query1.fieldbyname('emp_rnc').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select eNCF');
+                  dm.Query1.sql.add('from Montos_Ticket');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  dm.Query1.open;
+                  QTicketeNCF.value := dm.Query1.fieldbyname('eNCF').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select cod_dgii');
+                  dm.Query1.sql.add('from TipoNCF');
+                  dm.Query1.sql.add('where tip_codigo = :tip_codigo');
+                  dm.Query1.Parameters.parambyname('tip_codigo').Value  := QTickettip_codigo.Value;
+                  dm.Query1.open;
+                  QTicketTipoeNCF.value := dm.Query1.fieldbyname('cod_dgii').AsInteger;
+
+
+                  IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
+                  begin
+                    Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaResumenPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end
+                  else
+                  begin
+                  Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaElectronicaPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end;
+                     //ShowMessage('Resultado: ' + resultado);
+
+                  //resultado := Servicio.ProbarConexion(); // si tienes un mï¿½todo de prueba o conexiï¿½n
+                 // ShowMessage('Respuesta: ' + resultado);
+              except
+                on E: Exception do
+                 // ShowMessage('Error: ' + E.Message);
+              end;
+              end;
+             end;
 
 
         if Impresora.IDPrinter >  0 then
         ImprimeTicketFiscal(Impresora) else
         begin
         if UpperCase(pregunta) = 'S' then
+
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
-        ImpTicket;
+        BEGIN
+        //MessageDlg('IMPRIMIR TICKE
+        //  MessageDlg('IMPRIMIR TICKET 1',mtWarning,[mbOK],0);
+        //mruiz ImpTicketReport;
+         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
-        ImpTicket;
+        //mruiz ImpTicketReport;
+         ImpTicket;
         end;
 
         if Reimprimiendo = 'N' then
@@ -2160,12 +2697,17 @@ end;
 
         if Reimprimiendo = 'N' then
         begin
-        if Credito = 'True' then
-        begin
-           MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
-           //dm.Imp40Columnas(arch);
-           winexec('imp.bat',0);
-        end;
+        //if Credito = 'True' then
+         if  dm.QParametrosImprimirCopia.Value  then
+         begin
+          if MessageDlg('Desea imprimir la una copia?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+          begin
+             MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
+             //dm.Imp40Columnas(arch);
+             winexec('imp.bat',0);
+          end;
+         end;
+
       end;
 
 
@@ -2259,6 +2801,11 @@ procedure TfrmMain.pntarjetaClick(Sender: TObject);
 var
   ncf : integer;
   ncf_fijo : string;
+   prox: Int64;
+  Servicio: FacturaElectronicaService;
+  resultado: WideString;
+  ok: Boolean;
+  msg: string;
 begin
 //VerificarVentasInespre;
 //VerificarMasUnCombo;
@@ -2288,6 +2835,21 @@ begin
 
       TipoComprobante := QTickettip_codigo.Value;
 
+       if  (dm.QParametrosUsa_FacturacionElectronica.Value and dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+          begin
+                // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+                Exit;
+              end;
+          end;
+          
       Application.CreateForm(tfrmTarjeta, frmTarjeta);
 
       dm.Query1.Close;
@@ -2352,7 +2914,7 @@ begin
       frmDevoluciones.Release;
       frmTarjeta.lbdevolucion.Caption := format('%n',[frmTarjeta.devolucion]);
       frmTarjeta.lbsubtotal.Caption := format('%n',[frmTarjeta.total-frmTarjeta.devolucion]);
-      
+
       frmTarjeta.edMonto.text := FloatToStr (frmTarjeta.total-frmTarjeta.devolucion);
 
       frmTarjeta.ShowModal;
@@ -2533,14 +3095,138 @@ end;
           Query1.ExecSQL;
         end;
 
+        //Enviar a la DGII
+         if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+          begin
+                if  (dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+               begin
+               // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+               end else ok:=True;  
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+              end;
+
+              if (ok)  then
+              begin
+             //Proceso para enviar la Facturacion Electronica DGII
+
+                try
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('UPDATE Montos_Ticket');
+                  dm.Query1.sql.add('SET Enviado_DGII=1');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  QTicket.Edit;
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select emp_rnc');
+                  dm.Query1.sql.add('from empresas');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.Parameters.parambyname('emp').Value  := empcomprobante;
+                  dm.Query1.open;
+                  QTicketemp_rnc.value := dm.Query1.fieldbyname('emp_rnc').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select eNCF');
+                  dm.Query1.sql.add('from Montos_Ticket');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  dm.Query1.open;
+                  QTicketeNCF.value := dm.Query1.fieldbyname('eNCF').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select cod_dgii');
+                  dm.Query1.sql.add('from TipoNCF');
+                  dm.Query1.sql.add('where tip_codigo = :tip_codigo');
+                  dm.Query1.Parameters.parambyname('tip_codigo').Value  := QTickettip_codigo.Value;
+                  dm.Query1.open;
+                  QTicketTipoeNCF.value := dm.Query1.fieldbyname('cod_dgii').AsInteger;
+
+
+                  IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
+                  begin
+                    Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaResumenPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end
+                  else
+                  begin
+                  Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaElectronicaPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end;
+                     //ShowMessage('Resultado: ' + resultado);
+
+                  //resultado := Servicio.ProbarConexion(); // si tienes un mï¿½todo de prueba o conexiï¿½n
+                 // ShowMessage('Respuesta: ' + resultado);
+              except
+                on E: Exception do
+                 // ShowMessage('Error: ' + E.Message);
+              end;
+              end;
+             end;
+
+
          if Impresora.IDPrinter >  0 then
         ImprimeTicketFiscal(Impresora) else
         begin
         if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
-        ImpTicket;
+        begin
+         ImpTicket;
+        //mruiz ImpTicketReport;
+        end;
         if UpperCase(pregunta) = 'N' then
-        ImpTicket;
+         ImpTicket;
+        //mruiz ImpTicketReport;
         end;
 
   //    if Length(vl_respverifone)> 180 then begin
@@ -2558,19 +3244,25 @@ end;
         if Reimprimiendo = 'N' then
         ImpTicketRifa;
 
-        if Reimprimiendo = 'N' then
+             if Reimprimiendo = 'N' then
         begin
-        if Credito = 'True' then
-        begin
-           MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
-           //dm.Imp40Columnas(arch);
-           winexec('imp.bat',0);
-        end;
+        //if Credito = 'True' then
+         if  dm.QParametrosImprimirCopia.Value  then
+         begin
+          if MessageDlg('Desea imprimir la una copia?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+          begin
+             MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
+             //dm.Imp40Columnas(arch);
+             winexec('imp.bat',0);
+          end;
+         end;
+
       end;
 
-
-      if Puerto2 = 'T'  then
-      pnabrircaja2;
+      if Puerto2 = 'E'  then
+        pnabrircaja2;
+        if Puerto2 = 'T'  then
+        pnabrircaja2;
 
 
         //ImpTicketFiscal;
@@ -2589,6 +3281,11 @@ procedure TfrmMain.pnchequeClick(Sender: TObject);
 var
   ncf : integer;
   ncf_fijo : string;
+   prox: Int64;
+  Servicio: FacturaElectronicaService;
+  resultado: WideString;
+  ok: Boolean;
+  msg: string;
 begin
 //VerificarVentasInespre;
 //VerificarMasUnCombo;
@@ -2615,6 +3312,21 @@ begin
     end
     else
     begin
+
+     if  (dm.QParametrosUsa_FacturacionElectronica.Value and dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+          begin
+                // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+                Exit;
+              end;
+          end;
       Application.CreateForm(tfrmCheque, frmCheque);
 
       dm.Query1.Close;
@@ -2759,7 +3471,7 @@ begin
         QTicket.Post;
         QTicket.UpdateBatch;
         end;
-        
+
 //Serie fernando
 if not QSerie.IsEmpty then
 with dm.QQuery,sql do
@@ -2803,7 +3515,7 @@ end;
             Query1.ExecSQL;
           end;
         end;
-      
+
         QFormaPago.Close;
         if forma_numeracion = 1 then
         begin
@@ -2854,6 +3566,8 @@ end;
 
         //pnabrircajaClick(Self);
 
+        if Puerto2 = 'E'  then
+        pnabrircaja2;
         if Puerto2 = 'T'  then
         pnabrircaja2;
 
@@ -2865,12 +3579,131 @@ end;
         frmDevuelta.ShowModal;
         frmDevuelta.Release;
 
+        //Enviar a la DGII
+         if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+          begin
+                 if  (dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+               begin
+               // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+               end else ok:=True;
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+              end;
+
+              if (ok)  then
+              begin
+             //Proceso para enviar la Facturacion Electronica DGII
+
+                try
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('UPDATE Montos_Ticket');
+                  dm.Query1.sql.add('SET Enviado_DGII=1');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+
+                  QTicket.Edit;
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select emp_rnc');
+                  dm.Query1.sql.add('from empresas');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.Parameters.parambyname('emp').Value  := empcomprobante;
+                  dm.Query1.open;
+                  QTicketemp_rnc.value := dm.Query1.fieldbyname('emp_rnc').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select eNCF');
+                  dm.Query1.sql.add('from Montos_Ticket');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  dm.Query1.open;
+                  QTicketeNCF.value := dm.Query1.fieldbyname('eNCF').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select cod_dgii');
+                  dm.Query1.sql.add('from TipoNCF');
+                  dm.Query1.sql.add('where tip_codigo = :tip_codigo');
+                  dm.Query1.Parameters.parambyname('tip_codigo').Value  := QTickettip_codigo.Value;
+                  dm.Query1.open;
+                  QTicketTipoeNCF.value := dm.Query1.fieldbyname('cod_dgii').AsInteger;
+
+
+                  IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
+                  begin
+                    Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaResumenPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end
+                  else
+                  begin
+                  Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaElectronicaPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end;
+                     //ShowMessage('Resultado: ' + resultado);
+
+                  //resultado := Servicio.ProbarConexion(); // si tienes un mï¿½todo de prueba o conexiï¿½n
+                 // ShowMessage('Respuesta: ' + resultado);
+              except
+                on E: Exception do
+                 // ShowMessage('Error: ' + E.Message);
+              end;
+              end;
+             end;
+
+
+             
          if Impresora.IDPrinter >  0 then
         ImprimeTicketFiscal(Impresora) else
         begin
         if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+        BEGIN
+        //PRUEBA MRUIZ
+         // MessageDlg('IMPRIMIR TICKET 3',mtWarning,[mbOK],0);
         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
         ImpTicket;
         end;
@@ -2892,8 +3725,10 @@ end;
       end;
 
 
-      if Puerto2 = 'T'  then
-      pnabrircaja2;
+       if Puerto2 = 'E'  then
+        pnabrircaja2;
+        if Puerto2 = 'T'  then
+        pnabrircaja2;
 
 
         //ImpTicketNorma201806;
@@ -2915,6 +3750,11 @@ var
   num, diasvence, periodo, sec, descuentocxc : integer;
   vence : tdatetime;
   ano, mes, dia : word;
+   prox: Int64;
+  Servicio: FacturaElectronicaService;
+  resultado: WideString;
+  ok: Boolean;
+  msg: string;
 begin
 //VerificarVentasInespre;
 //VerificarMasUnCombo;
@@ -2941,6 +3781,20 @@ begin
     end
     else
     begin
+       if  (dm.QParametrosUsa_FacturacionElectronica.Value and dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+          begin
+                // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+                Exit;
+              end;
+          end;
       Application.CreateForm(tfrmCombinado, frmCombinado);
 
       dm.Query1.Close;
@@ -2971,7 +3825,7 @@ begin
       frmCombinado.lbtotal.Caption := lbtotal.Caption;
       frmCombinado.lbitbis.Caption := lbitbis.Caption;
       frmCombinado.ShowModal;
-      if (frmCombinado.Facturo = 1) and (frmCombinado.lbpendiente.Caption = '0.00') then 
+      if (frmCombinado.Facturo = 1) and (frmCombinado.lbpendiente.Caption = '0.00') then
       begin
         Boletos;
         QTicket.Edit;
@@ -3076,7 +3930,7 @@ begin
   ExecSQL;
 end;
 //fin serie
-        
+
         if TipoComprobante = 1 then
         begin
           //Verificando si tiene comprobante especifico para esa caja
@@ -3367,6 +4221,119 @@ end;
 
         //pnabrircajaClick(Self);
 
+           //Enviar a la DGII
+         if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+          begin
+                 if  (dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+               begin
+               // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+               end else ok:=True;
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+              end;
+
+              if (ok)  then
+              begin
+             //Proceso para enviar la Facturacion Electronica DGII
+
+                try
+                   dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('UPDATE Montos_Ticket');
+                  dm.Query1.sql.add('SET Enviado_DGII=1');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  
+                  QTicket.Edit;
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select emp_rnc');
+                  dm.Query1.sql.add('from empresas');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.Parameters.parambyname('emp').Value  := empcomprobante;
+                  dm.Query1.open;
+                  QTicketemp_rnc.value := dm.Query1.fieldbyname('emp_rnc').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select eNCF');
+                  dm.Query1.sql.add('from Montos_Ticket');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  dm.Query1.open;
+                  QTicketeNCF.value := dm.Query1.fieldbyname('eNCF').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select cod_dgii');
+                  dm.Query1.sql.add('from TipoNCF');
+                  dm.Query1.sql.add('where tip_codigo = :tip_codigo');
+                  dm.Query1.Parameters.parambyname('tip_codigo').Value  := QTickettip_codigo.Value;
+                  dm.Query1.open;
+                  QTicketTipoeNCF.value := dm.Query1.fieldbyname('cod_dgii').AsInteger;
+
+
+                  IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
+                  begin
+                    Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaResumenPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end
+                  else
+                  begin
+                  Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaElectronicaPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end;
+                     //ShowMessage('Resultado: ' + resultado);
+
+                  //resultado := Servicio.ProbarConexion(); // si tienes un mï¿½todo de prueba o conexiï¿½n
+                 // ShowMessage('Respuesta: ' + resultado);
+              except
+                on E: Exception do
+                 // ShowMessage('Error: ' + E.Message);
+              end;
+              end;
+             end;
+
 
         //pnabrircajaClick(Self);
 
@@ -3376,7 +4343,11 @@ end;
         begin
         if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+        BEGIN
+         //PRUEBA MRUIZ
+        // MessageDlg('IMPRIMIR TICKET 7',mtWarning,[mbOK],0);
         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
         ImpTicket;
         end;
@@ -3389,14 +4360,19 @@ end;
         if Reimprimiendo = 'N' then
         ImpTicketRifa;
 
-        if Reimprimiendo = 'N' then
+               if Reimprimiendo = 'N' then
         begin
-        if Credito = 'True' then
-        begin
-           MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
-           //dm.Imp40Columnas(arch);
-           winexec('imp.bat',0);
-        end;
+        //if Credito = 'True' then
+         if  dm.QParametrosImprimirCopia.Value  then
+         begin
+            if MessageDlg('Desea imprimir la una copia?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+            begin
+               MessageDlg('PRESIONE [ENTER] PARA IMPRIMIR LA COPIA',mtInformation,[mbok],0);
+               //dm.Imp40Columnas(arch);
+               winexec('imp.bat',0);
+            end;
+         end;
+
       end;
 
 
@@ -3425,8 +4401,10 @@ end;
         ImpTicket;
          }
 
-      if Puerto2 = 'T'  then
-      pnabrircaja2;
+       if Puerto2 = 'E'  then
+        pnabrircaja2;
+        if Puerto2 = 'T'  then
+        pnabrircaja2;
 
         TicketNuevo(true);
         IniciaDisplay;
@@ -3600,12 +4578,15 @@ begin
         Aumento := 0;
         cliente := 0;
 
-        if UpperCase(pregunta) = 'S' then
+       { if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+        BEGIN
+         
         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
         ImpTicket;
-
+                     }
 
         //ImpTicketNorma201806;
         TicketNuevo(true);
@@ -3717,7 +4698,7 @@ begin
         Query1.Parameters.ParamByName('cod').Value := frmEliminar.QDetalleproducto.Value;
         Query1.Open;
         Codigo := Query1.FieldByName('pro_roriginal').AsString;
-        BuscaProducto(codigo);
+        BuscaProducto(codigo, False);
 
         Query1.Close;
         Query1.SQL.Clear;
@@ -3803,6 +4784,7 @@ end;
 procedure TfrmMain.pnbuscaprodClick(Sender: TObject);
 var
   palabra, palabra1, palabra2 : string;
+  porcodigo:Boolean;
 begin
   if Trim(edproducto.Text) <> '' then
   begin
@@ -3823,6 +4805,8 @@ begin
     PrecioCaja := PrecioClie;
 
     Application.CreateForm(tfrmBuscaProducto, frmBuscaProducto);
+    if ((PrecioCaja='') or (PrecioCaja='Ninguno')
+    ) then PrecioCaja := 'Precio1';
     frmBuscaProducto.Precio := PrecioCaja;
     frmBuscaProducto.QProductos.SQL.Clear;
     frmBuscaProducto.QProductos.SQL.Add('select p.pro_nombre,');
@@ -3843,9 +4827,69 @@ begin
     frmBuscaProducto.ShowModal;
     if frmBuscaProducto.Selec = 1 then
     begin
-      edproducto.Text := frmBuscaProducto.QProductospro_roriginal.Value;
+      if (frmBuscaProducto.QProductospro_roriginal.Value<>'') THEN
+      begin
+        porcodigo:=False;
+        edproducto.Text := frmBuscaProducto.QProductospro_roriginal.Value;
+      end
+      else
+      begin
+        porcodigo:=True;
+         edproducto.Text := IntToStr(frmBuscaProducto.QProductospro_codigo.Value);
+      end;
+
       UltProd := edproducto.Text;
-      BuscaProducto(edproducto.Text);
+      BuscaProducto(edproducto.Text,porcodigo);
+
+        //Se verifica si este almacen permite facturar sin existencia
+      ConstAlmacen.Close;
+      ConstAlmacen.SQL.Clear;
+      ConstAlmacen.SQL.Add('select * from Almacen');
+      ConstAlmacen.SQL.Add('where alm_codigo = :alm_codigo');
+      ConstAlmacen.SQL.Add(' and emp_codigo = :emp_codigo');
+      ConstAlmacen.SQL.Add(' and alm_existneg = :alm_existneg');
+      ConstAlmacen.Parameters.ParamByName('alm_codigo').Value := almacen;
+      ConstAlmacen.Parameters.ParamByName('emp_codigo').Value := empresainv;
+      ConstAlmacen.Parameters.ParamByName('alm_existneg').Value := 'False';
+      ConstAlmacen.Open;
+
+      if ConstAlmacen.RecordCount > 0 then
+      begin
+      permitenegativo:=false end
+      else
+       permitenegativo:=true;
+
+      if (dm.Query1.FieldByName('pro_codigo').AsString<>'') then
+      begin
+       //Si no permite negativos verificamos que el producto tenga existencia
+      if (not permitenegativo) then
+      begin
+        ConsExistencia.Close;
+        ConsExistencia.SQL.Clear;
+        ConsExistencia.SQL.Add('select exi_cantidad from Existencias');
+        ConsExistencia.SQL.Add('where alm_codigo = :alm_codigo');
+        ConsExistencia.SQL.Add(' and emp_codigo = :emp_codigo');
+        ConsExistencia.SQL.Add(' and pro_codigo = :pro_codigo');
+        ConsExistencia.Parameters.ParamByName('alm_codigo').Value := almacen;
+        ConsExistencia.Parameters.ParamByName('emp_codigo').Value := empresainv;
+        ConsExistencia.Parameters.ParamByName('pro_codigo').Value := dm.Query1.FieldByName('pro_codigo').AsString;
+        ConsExistencia.Open;
+
+        if (ConsExistencia.RecordCount > 0 ) then
+        begin
+          if (ConsExistencia.FieldByName('exi_cantidad').AsFloat<=0) then
+          begin
+            MessageDlg('ESTE PRODUCTO NO TIENE EXISTENCIA, NO ES POSIBLE FACTURARLO!',mtError,[mbok],0);
+            edproducto.Text :='';
+            edproducto.SetFocus;
+            Exit;
+          end;
+        end;
+        end;
+      end;
+
+
+
       InsertaProducto;
     end
     else
@@ -3890,7 +4934,12 @@ begin
     Query1.Open;
 
     if Precio = 0 then
-    begin         
+    begin
+
+    if((PrecioCaja='') or (PrecioCaja='Ninguno')) then PrecioCaja:='Precio1';
+    if((PrecioEMP='') or (PrecioEMP='Ninguno')) then PrecioEMP:='Precio1' ;
+    
+
       if lbund.Caption = 'UNIDAD' then
             Precio := dm.Query1.FieldByName('pro_'+PrecioCaja).AsFloat
       else
@@ -4120,8 +5169,6 @@ end;
 procedure TfrmMain.pnNCFClick(Sender: TObject);
 var
   rnc, nombre : string;
-  a : integer;
-  valido : boolean;
 begin
   if QTickettotal.Value > 0 then
   begin
@@ -4136,51 +5183,12 @@ begin
       else if TipoComprobante = 3 then edncf.Caption := 'COMPROBANTE GUBERNAMENTAL'
       else if TipoComprobante = 4 then edncf.Caption := 'COMPROBANTE REGIMEN ESPECIAL';
      }
-      valido := true;
       rnc := InputBox('RNC del Cliente','RNC:',rnc);
-      rnc := Trim(rnc);
-      for a := 1 to length(rnc) do
+      rnc := NormalizarRNC(rnc);
+
+      if BuscarRNCEnDashaODGII(rnc, nombre, True) then
       begin
-        if (copy(rnc,a,1) <> '0') and (copy(rnc,a,1) <> '1') and
-        (copy(rnc,a,1) <> '2') and (copy(rnc,a,1) <> '3') and
-        (copy(rnc,a,1) <> '4') and (copy(rnc,a,1) <> '5') and
-        (copy(rnc,a,1) <> '6') and (copy(rnc,a,1) <> '7') and
-        (copy(rnc,a,1) <> '8') and (copy(rnc,a,1) <> '9') then
-        begin
-          valido := false;
-          break;
-        end;
-      end;
-
-      if not valido then
-        MessageDlg('DEBE DIGITAR UN RNC VALIDO, SIN GUIONES U OTROS SIGNOS, PRESIONE [ENTER] PARA SALIR',mtError,[mbok],0)
-      else
-        if length(rnc) < 9 then
-          MessageDlg('DEBE DIGITAR UN RNC VALIDO, PRESIONE [ENTER] PARA SALIR',mtError,[mbok],0)
-        else
-          begin
-        dm.Query1.Close;
-        dm.Query1.SQL.Clear;
-        dm.Query1.SQL.Add('select razon_social from rnc');
-        dm.Query1.SQL.Add('where rnc_cedula = :rnc');
-        dm.Query1.Parameters.ParamByName('rnc').Value := rnc;
-        dm.Query1.Open;
-        if dm.Query1.RecordCount > 0 then
-          nombre := dm.Query1.FieldByName('razon_social').AsString
-        else
-          nombre := '';
-
-        edTipoNCF.Text := IntToStr(TipoComprobante);
-          
-        if trim(nombre) = '' then
-        begin
-          rnc := '';
-          TipoComprobante := 1;
-        //OJO   edncf.Caption := 'COMPROBANTE CONSUMIDOR FINAL';
-          MessageDlg('EL CLIENTE NO EXISTE, PRESIONE [ENTER] PARA SALIR',mtError,[mbok],0);
-        end
-        else                      // ojo inicia debe dar valores defaul y cuando cobra debe de hacerlo otra vez no cuando entra productos
-        begin
+        // ojo inicia debe dar valores defaul y cuando cobra debe de hacerlo otra vez no cuando entra productos
           QTicket.Edit;
           QTicketrnc.Value    := rnc;
           QTicketnombre.Value := nombre;
@@ -4217,12 +5225,133 @@ begin
           Application.CreateForm(tfrmInformacionNCF, frmInformacionNCF);
           frmInformacionNCF.ShowModal;
           frmInformacionNCF.Release;
-        end;
+      end
+      else
+      begin
+        TipoComprobante := 1;
       end;
     end;
     frmNCF.Release;
   END;
 end;
+
+procedure TfrmMain.ImpTicketReport;
+begin
+     Application.CreateForm(TRTicket, RTicket);
+     
+     RTicket.QTicket.Parameters.ParamByName('caj').Value := edCaja.Caption;
+     RTicket.QTicket.Parameters.parambyname('usu').Value := dm.Usuario;
+     RTicket.QTicket.Parameters.parambyname('tik').Value := QTicketticket.Value;
+     RTicket.QTicket.Parameters.parambyname('fec').Value := QTicketfecha.Value;
+     RTicket.QTicket.Open;
+
+     RTicket.QEmpresa.Parameters.parambyname('emp').Value := empresainv;
+     RTicket.QEmpresa.Open;
+
+     RTicket.QDetalle.Parameters.ParamByName('caja').Value := edCaja.Caption;
+     RTicket.QDetalle.Parameters.parambyname('usu_codigo').Value := dm.Usuario;
+     RTicket.QDetalle.Parameters.parambyname('tiket').Value := QTicketticket.Value;
+     RTicket.QDetalle.Parameters.parambyname('fecha').Value := QTicketfecha.Value;
+     RTicket.QDetalle.Open;
+
+     RTicket.QFormaPago.Parameters.ParamByName('caja').Value := edCaja.Caption;
+     RTicket.QFormaPago.Parameters.parambyname('usu_codigo').Value := dm.Usuario;
+     RTicket.QFormaPago.Parameters.parambyname('tiket').Value := QTicketticket.Value;
+     RTicket.QFormaPago.Parameters.parambyname('fecha').Value := QTicketfecha.Value;
+     RTicket.QFormaPago.Open;
+
+     RTicket.PrinterSetup;
+     // RTicket.Prepare; // Opcional, prepara el reporte antes de imprimir
+  //RTicket.Print;
+
+     RTicket.Preview;
+     RTicket.Destroy;
+
+end;
+
+ 
+// --- Helpers ESC/POS ---
+function ESC(const b: Byte): AnsiString;
+begin
+  Result := AnsiChar(#27) + AnsiChar(b);
+end;
+
+function GS(const b: Byte): AnsiString;
+begin
+  Result := AnsiChar(#29) + AnsiChar(b);
+end;
+
+
+
+// Imprime QR nativo ESC/POS (module 1..16, EC: 48=L,49=M,50=Q,51=H)
+{procedure WriteQR(var F: TextFile; const Data: AnsiString; ModuleSize: Byte = 6; ECLevel: Byte = 48);
+var pL, pH: AnsiChar;
+begin
+  // centrar
+  Write(F, ESC($61) + AnsiChar(#1));              // ESC a 1
+
+  // modelo
+  Write(F, GS($28) + 'k' + #04#00 + #49#65#50#00); // GS ( k 4 0 1 41 2 0
+  // tamaï¿½o de mï¿½dulo
+  Write(F, GS($28) + 'k' + #03#00 + #49#67 + AnsiChar(ModuleSize));
+  // nivel de correcciï¿½n
+  Write(F, GS($28) + 'k' + #03#00 + #49#69 + AnsiChar(ECLevel));
+
+  // almacenar datos
+  pL := AnsiChar((Length(Data)+3) and $FF);
+  pH := AnsiChar((Length(Data)+3) shr 8);
+  Write(F, GS($28) + 'k' + pL + pH + #49#80#48 + Data);
+
+  // imprimir
+  Write(F, GS($28) + 'k' + #03#00 + #49#81 + #48);
+
+  // salto y volver a izquierda
+  Writeln(F); Writeln(F);
+  Write(F, ESC($61) + AnsiChar(#0));              // ESC a 0
+end;  }
+
+procedure WriteQR(var F: TextFile; const Data: AnsiString; ModuleSize: Byte = 6; ECLevel: Byte = 48);
+var pL, pH: AnsiChar;
+begin
+  // centrar
+  Write(F, ESC($61) + AnsiChar(#1));              // ESC a 1
+
+  // modelo
+  Write(F, GS($28) + 'k' + #04#00 + #49#65#50#00); // GS ( k 4 0 1 41 2 0
+  // tamaï¿½o de mï¿½dulo
+  Write(F, GS($28) + 'k' + #03#00 + #49#67 + AnsiChar(ModuleSize));
+  // nivel de correcciï¿½n
+  Write(F, GS($28) + 'k' + #03#00 + #49#69 + AnsiChar(ECLevel));
+
+  // almacenar datos
+  pL := AnsiChar((Length(Data)+3) and $FF);
+  pH := AnsiChar((Length(Data)+3) shr 8);
+  Write(F, GS($28) + 'k' + pL + pH + #49#80#48 + Data);
+
+  // imprimir
+  Write(F, GS($28) + 'k' + #03#00 + #49#81 + #48);
+
+  // salto y volver a izquierda
+  Writeln(F); Writeln(F);
+  Write(F, ESC($61) + AnsiChar(#0));              // ESC a 0
+end;
+
+
+
+
+// ---- Helper para imprimir cadenas largas envueltas a 40 columnas ----
+procedure PrintWrap40(var F: TextFile; const S: string);
+var
+  i: Integer;
+begin
+  i := 1;
+  while i <= Length(S) do
+  begin
+    Writeln(F, Copy(S, i, 40)); // imprime 40 caracteres por lï¿½nea
+    Inc(i, 40);
+  end;
+end;
+
 
 procedure TfrmMain.ImpTicket;
 var
@@ -4232,6 +5361,12 @@ var
   PuntosPrinc, FactorPrin, TotalPuntos, CalcDesc, NumItbis, TotalDescuento : Double;
   Puntos : integer;
   Msg1, Msg2, Msg3, Msg4, Forma, ImpItbis, lbItbis, codigoabre, pregunta : String;
+  qrData: AnsiString;
+  qrStr: string;
+  qrBits: TBytes;
+  qrW, qrH: Integer;
+  qrURL, codSeg, fechaFirma, codDGII, sENCF: string;
+  aceptado: Boolean;
 begin
 
       dm.Query1.Close;
@@ -4250,9 +5385,6 @@ begin
       dm.Query1.Open;
       Puerto := DM.Query1.FieldByName('Puerto').AsString;
       Puerto2 := DM.Query1.FieldByName('Puerto2').AsString;
-
-
-
 
 
       dm.Query1.Close;
@@ -4280,17 +5412,31 @@ begin
       writeln(arch, dm.centro('RNC:'+dm.Query1.fieldbyname('EMP_RNC').Value));
       writeln(arch, ' ');
       writeln(arch, dm.centro('*** F A C T U R A ***'));
-      if Credito = 'True' then
+       if Credito = 'True' then
          writeln(arch, dm.centro('* C R E D I T O *'));
+       if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+      begin
+        dm.Query1.Close;
+        dm.Query1.SQL.Clear;
+        dm.Query1.SQL.Add('SELECT nombre_dgii FROM TipoNCF');
+        dm.Query1.SQL.Add('WHERE cod_dgii = :cod_dgii');
+        dm.Query1.Parameters.ParamByName('cod_dgii').Value := QTicketTipoeNCF.Value;
+        dm.Query1.Open;
 
-      dm.Query1.Close;
-      dm.Query1.SQL.Clear;
-      dm.Query1.SQL.Add('select ncf_nombre from ncf_ticket_tipodoc');
-      dm.Query1.SQL.Add('where ncf_numero = :tipo');
-      dm.Query1.Parameters.ParamByName('tipo').Value := QTicketNCF_Tipo.Value;
-      dm.Query1.Open;
+        writeln(arch, dm.centro(dm.Query1.FieldByName('nombre_dgii').AsString));
+      end
+      else
+      begin
+        dm.Query1.Close;
+        dm.Query1.SQL.Clear;
+        dm.Query1.SQL.Add('select ncf_nombre from ncf_ticket_tipodoc');
+        dm.Query1.SQL.Add('where ncf_numero = :tipo');
+        dm.Query1.Parameters.ParamByName('tipo').Value := QTicketNCF_Tipo.Value;
+        dm.Query1.Open;
 
-      writeln(arch, dm.Centro(dm.Query1.FieldByName('ncf_nombre').AsString));
+        writeln(arch, dm.centro(dm.Query1.FieldByName('ncf_nombre').AsString));
+      end;
+
       writeln(arch, ' ');
 
       dm.Query1.close;
@@ -4313,25 +5459,79 @@ begin
         if Trim(QTicketrnc.Value) <> '' then
           writeln(arch, 'RNC .....: '+QTicketrnc.Value);
       end;
+      if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+      begin
+        dm.Query1.close;
+        dm.Query1.sql.clear;
+        dm.Query1.sql.add('select eNCF');
+        dm.Query1.sql.add('from Montos_Ticket');
+        dm.Query1.sql.add('where emp_codigo = :emp');
+        dm.Query1.sql.add('and usu_codigo = :usu');
+        dm.Query1.sql.add('and ticket = :numero');
+        dm.Query1.sql.add('and caja = :caja');
+        dm.Query1.sql.add('and suc_codigo = :suc');
 
-      if QTicketNCF.Value <> '' then
-        writeln(arch,'NCF .....: '+QTicketNCF.Value);
+        dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+        dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+        dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+        dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+        dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+        dm.Query1.open;
+        sENCF := dm.Query1.fieldbyname('eNCF').AsString;
+
+      if sENCF <> '' then
+        writeln(arch,'eNCF ....: '+sENCF);
+
       //buscar vencimiento
-      with QDatos do begin
-      Close;
-      sql.Clear;
-      SQL.Add('select top 1 FechaVenc ');
-      sql.Add('from NCF ');
-      sql.Add('where VerificaVenc = 1 and emp_codigo = :emp_codigo');
-      sql.Add('and NCF_Fijo   = :NCF_Fijo');
-      sql.Add('ORDER BY FECHAVENC');
-      Parameters.ParamByName('emp_codigo').Value := QTicketemp_codigo.Value;
-      Parameters.ParamByName('NCF_Fijo').Value   := QTicketNCF_Fijo.Text;
-      Open;
-      if not IsEmpty then
-      writeln(arch,'Fecha Venc.: '+FieldByName('FechaVenc').text);
-      end;
+      with QDatos do
+      begin
+        Close;
+        SQL.Clear;
+        SQL.Add('SELECT TOP 1');
+        SQL.Add('    FechaVencimientoSecuenciaDGII');
+        SQL.Add('FROM SecuenciaDGII');
+        SQL.Add('WHERE FechaVencimientoSecuenciaDGII IS NOT NULL');
+        SQL.Add('  AND emp_codigo = :emp_codigo');
+        SQL.Add('  AND tipo       = :tipo');
+        SQL.Add('ORDER BY FechaVencimientoSecuenciaDGII');
 
+        Parameters.ParamByName('emp_codigo').Value := QTicketemp_codigo.Value;
+        Parameters.ParamByName('tipo').Value       := QTicketTipoeNCF.Value;
+
+        Open;
+
+        if not IsEmpty then
+          Writeln(arch, 'Fecha Venc.: ' + FieldByName('FechaVencimientoSecuenciaDGII').AsString);
+      end;
+      end
+      else
+      begin
+        if QTicketNCF.Value <> '' then
+        writeln(arch,'NCF .....: '+QTicketNCF.Value);
+
+        with QDatos do
+        begin
+          Close;
+          SQL.Clear;
+
+          SQL.Add('SELECT TOP 1 FechaVenc');
+          SQL.Add('FROM NCF');
+          SQL.Add('WHERE VerificaVenc = 1');
+          SQL.Add('  AND emp_codigo = :emp_codigo');
+          SQL.Add('  AND NCF_Fijo   = :NCF_Fijo');
+          SQL.Add('ORDER BY FechaVenc');
+
+          Parameters.ParamByName('emp_codigo').Value := QTicketemp_codigo.Value;
+          Parameters.ParamByName('NCF_Fijo').Value   := QTicketNCF_Fijo.Text;
+
+          Open;
+
+          if not IsEmpty then
+            Writeln(arch, 'Fecha Venc.: ' + FieldByName('FechaVenc').Text);
+        end;  
+      end;
+      
       if Trim(TarjetaClub) <> '' then
       begin
          Query1.close;
@@ -4538,11 +5738,11 @@ begin
         writeln(arch, 'Firma del Supervisor');
       end;
       writeln(arch, ' ');
-      writeln(arch, ' ');
+      //writeln(arch, ' ');
       if QDetalle.RecordCount > 0 then
       writeln(arch, 'Cantidad Articulos '+FormatCurr('#,0',QDetalle.RecordCount));
       writeln(arch, ' ');
-      writeln(arch, ' ');
+      //writeln(arch, ' ');
 
       Query1.close;
       Query1.SQL.clear;
@@ -4644,15 +5844,73 @@ begin
       end;
 
       writeln(arch, ' ');
+      {writeln(arch, ' ');
       writeln(arch, ' ');
-      writeln(arch, ' ');
-      writeln(arch, ' ');
-      writeln(arch, ' ');
-      writeln(arch, ' ');
-      writeln(arch, ' ');
-      writeln(arch, ' ');
+      writeln(arch, ' ');  }
 
-     
+      Query1.Close;
+      Query1.SQL.Clear;
+
+      Query1.SQL.Add('SELECT');
+      Query1.SQL.Add('    UrlCodigoQR,');
+      Query1.SQL.Add('    codigoseguridad,');
+      Query1.SQL.Add('    fechafirma,');
+      Query1.SQL.Add('    cod_dgii,');
+      Query1.SQL.Add('    AceptadoDGII');
+      Query1.SQL.Add('FROM vwPOS_UrlCodigoQR');
+      Query1.SQL.Add('WHERE emp_codigo = :emp');
+      Query1.SQL.Add('  AND usu_codigo = :usu');
+      Query1.SQL.Add('  AND ticket     = :ticket');
+      Query1.SQL.Add('  AND caja       = :caja');
+      Query1.SQL.Add('  AND suc_codigo = :suc');
+
+      Query1.Parameters.ParamByName('emp').Value    := empresainv;
+      Query1.Parameters.ParamByName('usu').Value    := QTicketUSU_CODIGO.Value;
+      Query1.Parameters.ParamByName('ticket').Value := QTicketTICKET.Value;
+      Query1.Parameters.ParamByName('caja').Value   := QTicketCAJA.Value;
+      Query1.Parameters.ParamByName('suc').Value    := QTicketsuc_codigo.Value;
+
+      Query1.Open;
+
+      qrURL      := '';
+      codSeg     := '';
+      fechaFirma := '';
+      codDGII    := '';
+      aceptado   := False;
+      if not Query1.IsEmpty then
+      begin
+        qrURL      := Query1.FieldByName('UrlCodigoQR').AsString;
+        codSeg     := Query1.FieldByName('codigoseguridad').AsString;
+        fechaFirma := Query1.FieldByName('fechafirma').AsString;
+        codDGII    := Query1.FieldByName('cod_dgii').AsString;
+        if not Query1.FieldByName('AceptadoDGII').IsNull then
+          aceptado := Query1.FieldByName('AceptadoDGII').AsBoolean;
+      end;
+
+      { Siempre imprimir ticket: QR solo si DGII acepto y hay URL; si no, texto de trazabilidad. }
+      if aceptado and (Trim(qrURL) <> '') then
+      begin
+        qrData := AnsiString(Trim(qrURL));
+        WriteQR(arch, qrData, 6, 48);   // m?dulo 6, nivel L (r?pido y legible)
+        Writeln(arch, 'Fecha firma: ' + fechaFirma);
+        Writeln(arch, 'Cod. seguridad: ' + codSeg);
+      end
+      else
+      begin
+        if Trim(fechaFirma) <> '' then
+          Writeln(arch, 'Fecha firma: ' + fechaFirma);
+        if Trim(codSeg) <> '' then
+          Writeln(arch, 'Cod. seguridad: ' + codSeg);
+        if Trim(codDGII) <> '' then
+          Writeln(arch, 'Cod. DGII: ' + codDGII);
+        if not aceptado then
+          Writeln(arch, 'DGII: pendiente o error - verifique en sistema')
+        else if Trim(qrURL) = '' then
+          Writeln(arch, 'Codigo QR: no disponible');
+      end;
+
+      Query1.Close;
+
       dm.Query1.Close;
       dm.Query1.SQL.Clear;
       dm.Query1.SQL.Add('select Puerto, codigo_abre_caja from cajas_ip');
@@ -4661,14 +5919,16 @@ begin
       dm.Query1.Open;
       codigoabre := dm.Query1.FieldByName('codigo_abre_caja').AsString;
 
-
-      if codigoabre = 'Termica' then
-        writeln(arch,chr(27)+chr(109));
+      //Writeln(arch, '--- FIN TICKET ANTES DEL CORTE ---');
+     { if codigoabre = 'Termica' then
+        writeln(arch,chr(27)+chr(109));  }
+      // ---- Corte de papel ----
+      Write(arch, GS($56) + AnsiChar(#66) + AnsiChar(#0));  // GS V B 0  (corte parcial)
+      Writeln(arch);
 
       closefile(Arch);
       //dm.Imp40Columnas(arch);
-      winexec('.\imp.bat',0);
-
+      winexec('.\imp.bat',0);   
 
 
       if Reimprimiendo = 'N' then
@@ -4710,9 +5970,7 @@ begin
       end;
       end;
 
-
-     
-    end;
+end;
 
 procedure TfrmMain.QTicketCalcFields(DataSet: TDataSet);
 begin
@@ -4764,6 +6022,7 @@ begin
       begin
         QTicket.DisableControls;
         QTicket.Close;
+
         if forma_numeracion = 1 then
         begin
           QTicket.SQL.Clear;
@@ -4775,6 +6034,7 @@ begin
         QTicket.Parameters.ParamByName('caj').Value    := StrToInt(edcaja.Caption);
         QTicket.Parameters.ParamByName('tik').Value    := frmAnular.QTicketticket.Value;
         QTicket.Open;
+        QTicket.Edit;
         MovTicket := QTicketmov_numero.Value;
 
         QDetalle.DisableControls;
@@ -4847,7 +6107,11 @@ begin
         Boletos;
         if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+       BEGIN
+        //PRUEBA MRUIZ
+        //  MessageDlg('IMPRIMIR TICKET 9',mtWarning,[mbOK],0);
         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
         ImpTicket;
 
@@ -4889,6 +6153,7 @@ Application.CreateForm(tfrmAcceso, frmAcceso);
     end
     else
     begin
+
   dm.Query1.Close;
   dm.Query1.SQL.Clear;
   dm.Query1.SQL.Add('select Puerto, codigo_abre_caja from cajas_IP');
@@ -4900,7 +6165,10 @@ Application.CreateForm(tfrmAcceso, frmAcceso);
 
   if Impresora.IDPrinter = 1 then begin
   if puedeAbrirCaja then
+  BEGIN
+
   OpenCashDrawerFiscal(Impresora)
+  END;
   end
   else
     begin
@@ -4953,6 +6221,13 @@ end;
 procedure TfrmMain.edcantidadKeyPress(Sender: TObject; var Key: Char);
 
 begin
+
+ {if Key in ['W', 'w'] then
+  begin
+    actBuscarPesoExecute(Sender); // Llama al procedimiento si es W o w
+    Key := #0; // Opcional: Consume la tecla para que no se escriba en el texto
+  end;    }
+  
   if key = #13 then
   begin
     if (Pos('.',edCantidad.text) = 0) and (Length(edCantidad.Text) > 3) then
@@ -5001,6 +6276,12 @@ var
   num, diasvence, periodo, sec, descuentocxc : integer;
   vence : tdatetime;
   ncf_fijo, tdo : string;
+    prox: Int64;
+  Servicio: FacturaElectronicaService;
+  resultado: WideString;
+  ok: Boolean;
+  msg: string;
+
   
 begin
   if QTickettotal.Value > 0 then
@@ -5308,6 +6589,119 @@ begin
           end;
         end;
 
+        //Enviar a la DGII
+         if  dm.QParametrosUsa_FacturacionElectronica.Value  then
+          begin
+                if  (dm.QParametrosPAR_FE_DetenerFacturacion.value)  then
+               begin
+               // 1) Validar disponibilidad de secuencia SIN reservar ni asignar
+                ok := ValidarENCFDisponible(
+                        QTicketemp_codigo.Value,
+                        QTickettip_codigo.Value,
+                        msg, prox);
+               end else ok:=True;
+
+              if (not ok)  then
+              begin
+                ShowMessage('No hay comprobantes fiscales disponibles para esta factura.');
+              end;
+
+              if (ok)  then
+              begin
+             //Proceso para enviar la Facturacion Electronica DGII
+
+                try
+                   dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('UPDATE Montos_Ticket');
+                  dm.Query1.sql.add('SET Enviado_DGII=1');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  QTicket.Edit;
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select emp_rnc');
+                  dm.Query1.sql.add('from empresas');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.Parameters.parambyname('emp').Value  := empcomprobante;
+                  dm.Query1.open;
+                  QTicketemp_rnc.value := dm.Query1.fieldbyname('emp_rnc').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select eNCF');
+                  dm.Query1.sql.add('from Montos_Ticket');
+                  dm.Query1.sql.add('where emp_codigo = :emp');
+                  dm.Query1.sql.add('and usu_codigo = :usu');
+                  dm.Query1.sql.add('and ticket = :numero');
+                  dm.Query1.sql.add('and caja = :caja');
+                  dm.Query1.sql.add('and suc_codigo = :suc');
+
+                  dm.Query1.Parameters.parambyname('emp').Value    := QTicketemp_codigo.value;
+                  dm.Query1.Parameters.parambyname('suc').Value    := QTicketsuc_codigo.Value;
+                  dm.Query1.Parameters.parambyname('usu').Value   := QTicketusu_codigo.value;
+                  dm.Query1.Parameters.parambyname('caja').Value   := QTicketcaja.Value;
+                  dm.Query1.Parameters.parambyname('numero').Value := QTicketticket.value;
+
+                  dm.Query1.open;
+                  QTicketeNCF.value := dm.Query1.fieldbyname('eNCF').AsString;
+
+                  dm.Query1.close;
+                  dm.Query1.sql.clear;
+                  dm.Query1.sql.add('select cod_dgii');
+                  dm.Query1.sql.add('from TipoNCF');
+                  dm.Query1.sql.add('where tip_codigo = :tip_codigo');
+                  dm.Query1.Parameters.parambyname('tip_codigo').Value  := QTickettip_codigo.Value;
+                  dm.Query1.open;
+                  QTicketTipoeNCF.value := dm.Query1.fieldbyname('cod_dgii').AsInteger;
+
+
+                  IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
+                  begin
+                    Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaResumenPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end
+                  else
+                  begin
+                  Servicio := CoFacturaElectronicaService.Create;
+                      resultado := Servicio.EnviarFacturaElectronicaPOS(
+                      IntToStr(QTicketemp_codigo.Value),
+                      IntToStr(QTicketsuc_codigo.Value),
+                      IntToStr(QTicketticket.Value),
+                      QTicketemp_rnc.Value,
+                      QTicketeNCF.Value,
+                      QTicketrnc.Value,
+                      IntToStr(QTicketusu_codigo.Value),
+                      IntToStr(QTicketcaja.Value),
+                      IntToStr(QTicketTipoeNCF.Value)
+                    );
+                  end;
+                     //ShowMessage('Resultado: ' + resultado);
+
+                  //resultado := Servicio.ProbarConexion(); // si tienes un mï¿½todo de prueba o conexiï¿½n
+                 // ShowMessage('Respuesta: ' + resultado);
+              except
+                on E: Exception do
+                 // ShowMessage('Error: ' + E.Message);
+              end;
+              end;
+             end;
+
+
         if ImprimeCredito = 'True' then ImpTicket
         else
           MessageDlg('DEBE PASAR POR SERVICIO AL CLIENTE PARA IMPRIMIR LA FACTURA',mtInformation,[mbok],0);
@@ -5364,7 +6758,7 @@ begin
     Precio := 0;
     edproducto.Text := dm.Query1.FieldByName('pro_roriginal').AsString;
     UltProd := edproducto.Text;
-    BuscaProducto(edproducto.Text);
+    BuscaProducto(edproducto.Text, False);
     if MDLista.RecordCount >  0 then begin
     if ((MDLista.Locate('LProducto',IntToStr(GetProducto),[])) and
       (dm.QParametrosPAR_FACREPITEPROD.Value = 'False')) then
@@ -5624,7 +7018,7 @@ begin
       edproducto.Text := frmVerPrecio.prod;
 
       Precio := 0;
-      BuscaProducto(edproducto.Text);
+      BuscaProducto(edproducto.Text,False);
       InsertaProducto;
     end;
     frmVerPrecio.Release;
@@ -5672,7 +7066,52 @@ begin
   if Trim(UltProd) <> '' then
   begin
     edproducto.Text := UltProd;
-    BuscaProducto(UltProd);
+    BuscaProducto(UltProd,False);
+    //Se verifica si este almacen permite facturar sin existencia
+      ConstAlmacen.Close;
+      ConstAlmacen.SQL.Clear;
+      ConstAlmacen.SQL.Add('select COUNT(*) from Almacen');
+      ConstAlmacen.SQL.Add('where alm_codigo = :alm_codigo');
+      ConstAlmacen.SQL.Add(' and emp_codigo = :emp_codigo');
+      ConstAlmacen.SQL.Add(' and alm_existneg = :alm_existneg');
+      ConstAlmacen.Parameters.ParamByName('alm_codigo').Value := almacen;
+      ConstAlmacen.Parameters.ParamByName('emp_codigo').Value := empresainv;
+      ConstAlmacen.Parameters.ParamByName('alm_existneg').Value := 'False';
+      ConstAlmacen.Open;
+
+      if ConstAlmacen.RecordCount > 0 then
+      begin
+      permitenegativo:=false end
+      else
+       permitenegativo:=true;
+     if (dm.Query1.FieldByName('pro_codigo').AsString<>'') then
+      begin
+       //Si no permite negativos verificamos que el producto tenga existencia
+      if (not permitenegativo) then
+      begin
+        ConsExistencia.Close;
+        ConsExistencia.SQL.Clear;
+        ConsExistencia.SQL.Add('select exi_cantidad from Existencias');
+        ConsExistencia.SQL.Add('where alm_codigo = :alm_codigo');
+        ConsExistencia.SQL.Add(' and emp_codigo = :emp_codigo');
+        ConsExistencia.SQL.Add(' and pro_codigo = :pro_codigo');
+        ConsExistencia.Parameters.ParamByName('alm_codigo').Value := almacen;
+        ConsExistencia.Parameters.ParamByName('emp_codigo').Value := empresainv;
+        ConsExistencia.Parameters.ParamByName('pro_codigo').Value := dm.Query1.FieldByName('pro_codigo').AsString;
+        ConsExistencia.Open;
+
+        if (ConsExistencia.RecordCount > 0 ) then
+        begin
+          if (ConsExistencia.FieldByName('exi_cantidad').AsFloat<=0) then
+          begin
+            MessageDlg('ESTE PRODUCTO NO TIENE EXISTENCIA, NO ES POSIBLE FACTURARLO!',mtError,[mbok],0);
+             edproducto.Text :='';
+             edproducto.SetFocus;
+            Exit;
+          end;
+        end;
+        end;
+      end;
     InsertaProducto;
   end;
   edproducto.Text := '';
@@ -5998,16 +7437,18 @@ begin
       end;
       if realizar then
       begin
-        QTicket.Edit;
+        Totaliza;
+        if not (QTicket.State in [dsEdit, dsInsert]) then
+          QTicket.Edit;
         QTicketstatus.Value := 'TMP';
         QTicket.Post;
-     QTicket.UpdateBatch;
+        QTicket.UpdateBatch;
 
-      if UpperCase(pregunta) = 'S' then
-        if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
-        ImpTicket;
-        if UpperCase(pregunta) = 'N' then
-        ImpTicket;
+        if UpperCase(Pregunta) = 'S' then
+          if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+            ImpTicket;
+        if UpperCase(Pregunta) = 'N' then
+          ImpTicket;
 
       TicketNuevo(true);
      // ImpTicketNorma201806;
@@ -6258,7 +7699,11 @@ begin
 
       if UpperCase(pregunta) = 'S' then
         if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
+      BEGIN
+       //PRUEBA MRUIZ
+       // MessageDlg('IMPRIMIR TICKET 4',mtWarning,[mbOK],0);
         ImpTicket;
+        END;
         if UpperCase(pregunta) = 'N' then
         ImpTicket;
 
@@ -6722,7 +8167,7 @@ procedure TfrmMain.bttiponcfClick(Sender: TObject);
 begin
   Search.AliasFields.clear;
   Search.AliasFields.add('Nombre');
-  Search.AliasFields.add('Código');
+  Search.AliasFields.add('Codigo');
   Search.Query.Clear;
   Search.Query.Add('select tip_nombre, tip_codigo');
   Search.Query.Add('from TipoNCF');
@@ -6995,6 +8440,8 @@ begin
 end;
 
 procedure TfrmMain.edTipoNCFKeyPress(Sender: TObject; var Key: Char);
+var
+  rnc, nombre: string;
 begin
   if (key = #13) and (Trim(edTipoNCF.Text) <> '')then
     begin
@@ -7018,6 +8465,26 @@ begin
                   QTicket.Edit;
                 QTickettip_codigo.Value := StrToInt(edTipoNCF.Text);
                 QTicketNCF_Tipo.Value := StrToInt(edTipoNCF.Text);
+
+                if (TipoComprobante <> 1) and (Trim(QTicketrnc.AsString) = '') then
+                begin
+                  rnc := InputBox('RNC del Cliente','RNC:',rnc);
+                  rnc := NormalizarRNC(rnc);
+
+                  if BuscarRNCEnDashaODGII(rnc, nombre, True) then
+                  begin
+                    QTicketrnc.Value := rnc;
+                    QTicketnombre.Value := nombre;
+                  end
+                  else
+                  begin
+                    TipoComprobante := 1;
+                    QTickettip_codigo.Value := 1;
+                    QTicketNCF_Tipo.Value := 1;
+                    edTipoNCF.Text := IntToStr(TipoComprobante);
+                  end;
+                end;
+
                 edproducto.SetFocus();
               end;
 
@@ -7236,6 +8703,8 @@ begin
   begin
     if MessageDlg('Desea imprimir el ticket?', mtConfirmation, [mbyes, mbno], 0) = mryes then
     begin
+      //MRUIZ PRUEBA
+      //MessageDlg('IMPRIMIR TICKET 3',mtWarning,[mbOK],0);
       dm.Query1.Close;
       dm.Query1.SQL.Clear;
       dm.Query1.SQL.Add('select par_ticket_itbis from parametros');
@@ -7900,6 +9369,18 @@ var
   vp_puerto, lbitbis, impcodigo, parametro, Unidad, codigoabre : string;
   a,x : integer;
   b : myJSONItem;
+  FieldExists: Boolean;
+  FieldName: string;
+  JSONString: string;
+  FechaHora: string;
+  Fecha: string;
+  Hora: string;
+  Linea,LineaCard: string;
+  DisplayRateRaw: string;
+  DisplayRateReal: Double;
+  MarginRateRaw: string;
+  MarginRatePercent: Double;
+
 begin
 with qImpCardNet do begin
 Close;
@@ -7923,6 +9404,10 @@ if qImpCardNet.RecordCount > 0 then begin
 
   b := myJSONItem.Create;
   b.Code :=  qImpCardNet.fieldByName('JSON').Value;
+  
+  JSONString := b.Code;
+  FieldName := '"dynamiccurrencyconversion"';
+  FieldExists := Pos(FieldName, JSONString) > 0;
 
   if FileExists('.\puerto.txt') then
   begin
@@ -7932,132 +9417,324 @@ if qImpCardNet.RecordCount > 0 then begin
   end
   else
     puerto := 'PRN';
+   if not FieldExists then
+   begin
+      closefile(puertopeqCardNet);
 
-  closefile(puertopeqCardNet);
+      AssignFile(archCardNet, '.\impverifone.bat');
+      rewrite(archCardNet);
+      writeln(archCardNet, 'type .\tverifone.txt > '+vp_puerto);
+      closefile(archCardNet);
 
-  AssignFile(archCardNet, '.\impverifone.bat');
-  rewrite(archCardNet);
-  writeln(archCardNet, 'type .\tverifone.txt > '+vp_puerto);
-  closefile(archCardNet);
+      //Ticket Comercio
+      AssignFile(archCardNet, '.\tverifone.txt');
+      rewrite(archCardNet);
+      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
+      writeln(archCardNet,dm.centro(parametro));
+      writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
+      writeln(archCardNet,b['DataTime'].getStr);
+      parametro := IntToStr(b['Transaction']['Reference'].getInt);
+      writeln(archCardNet,'No. Trans.      : '+parametro);
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('REGISTRO ImpTicketCardNet DE LA TRANSACCION'));
+      writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
+      writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
+      writeln(archCardNet,'');
+      writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
+      if not b['Transaction']['LoyaltyDeferredNumber'].isNull then
+      writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
+      parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
+      writeln(archCardNet,'No. tarjeta     : '+parametro);
+      writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
+      writeln(archCardNet,'APROBADA        : EN LINEA');
+      writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
+      writeln(archCardNet,'Monto RD$       : '+ parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
+      writeln(archCardNet,'Itbis RD$       : '+parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
+      writeln(archCardNet,'Total RD$       : '+parametro);
+      writeln(archCardNet,'');
+      writeln(archCardNet,DM.CENTRO('APROBADA'));
+      writeln(archCardNet,'');
+      writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
+      writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
+      writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
+      writeln(archCardNet,'');
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.Centro('_________________________'));
+      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Original Comercio***'));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
+      for x:= 1 to 2 do begin
+      writeln(archCardNet,'');
+      end;
 
-  //Ticket Comercio
-  AssignFile(archCardNet, '.\tverifone.txt');
-  rewrite(archCardNet);
-  parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-  writeln(archCardNet,dm.centro(parametro));
-  writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
-  writeln(archCardNet,b['DataTime'].getStr);
-  parametro := IntToStr(b['Transaction']['Reference'].getInt);
-  writeln(archCardNet,'No. Trans.      : '+parametro);
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('REGISTRO DE LA TRANSACCION'));
-  writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
-  writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
-  writeln(archCardNet,'');
-  writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
-  if not b['Transaction']['LoyaltyDeferredNumber'].isNull then 
-  writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
-  parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
-  writeln(archCardNet,'No. tarjeta     : '+parametro);
-  writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
-  writeln(archCardNet,'APROBADA        : EN LINEA');
-  writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-  writeln(archCardNet,'Monto RD$       : '+ parametro);
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-  writeln(archCardNet,'Itbis RD$       : '+parametro);
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-  writeln(archCardNet,'Total RD$       : '+parametro);
-  writeln(archCardNet,'');
-  writeln(archCardNet,DM.CENTRO('APROBADA'));
-  writeln(archCardNet,'');
-  writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
-  writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
-  writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
-  writeln(archCardNet,'');
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.Centro('_________________________'));
-  writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('***Original Comercio***'));
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
-  for x:= 1 to 2 do begin
-  writeln(archCardNet,'');
-  end;
+      if codigoabre = 'Termica' then
+      writeln(archCardNet,chr(27)+chr(109));
 
-  if codigoabre = 'Termica' then
-  writeln(archCardNet,chr(27)+chr(109));
+      CloseFile(archCardNet);
 
-  CloseFile(archCardNet);
+     winexec('.\impverifone.bat',0);
 
- winexec('.\impverifone.bat',0);
+     //Ticket Copia
+      AssignFile(archCardNet, '.\tverifoneCopia.bat');
+      rewrite(archCardNet);
+      writeln(archCardNet, 'type .\tverifoneCopia.txt > '+vp_puerto);
+      closefile(archCardNet);
 
- //Ticket Copia
-  AssignFile(archCardNet, '.\tverifoneCopia.bat');
-  rewrite(archCardNet);
-  writeln(archCardNet, 'type .\tverifoneCopia.txt > '+vp_puerto);
-  closefile(archCardNet);
+      AssignFile(archCardNet, '.\tverifoneCopia.txt');
+      rewrite(archCardNet);
+      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
+      writeln(archCardNet,dm.centro(parametro));
+      writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
+      writeln(archCardNet,b['DataTime'].getStr);
+      //parametro := IntToStr(b['Transaction']['Reference'].getInt);
+      //writeln(archCardNet,'No. Trans.      : '+parametro);
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('REGISTRO ImpTicketCardNet DE LA TRANSACCION'));
+      //writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
+      //writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
+      writeln(archCardNet,'');
+      writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
+      //writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
+      parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
+      writeln(archCardNet,'No. tarjeta     : '+parametro);
+      writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
+      writeln(archCardNet,'APROBADA        : EN LINEA');
+      //writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
+      //writeln(archCardNet,'');
+      writeln(archCardNet,'');
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
+      writeln(archCardNet,'Monto RD$       : '+ parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
+      writeln(archCardNet,'Itbis RD$       : '+parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
+      writeln(archCardNet,'Total RD$       : '+parametro);
+      //writeln(archCardNet,'');
+      //writeln(archCardNet,'');
+      writeln(archCardNet,DM.CENTRO('APROBADA'));
+     // writeln(archCardNet,'');
+     // writeln(archCardNet,'');
+     // writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
+      writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
+      writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
+     // writeln(archCardNet,'Hora             : '+trim(copy(b['Transaction']['DataTime'].getStr,12,20)));
+      //writeln(archCardNet,'');
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Copia Cliente***'));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
 
-  AssignFile(archCardNet, '.\tverifoneCopia.txt');
-  rewrite(archCardNet);
-  parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-  writeln(archCardNet,dm.centro(parametro));
-  writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
-  writeln(archCardNet,b['DataTime'].getStr);
-  //parametro := IntToStr(b['Transaction']['Reference'].getInt);
-  //writeln(archCardNet,'No. Trans.      : '+parametro);
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('REGISTRO DE LA TRANSACCION'));
-  //writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
-  //writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
-  writeln(archCardNet,'');
-  writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
-  //writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
-  parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
-  writeln(archCardNet,'No. tarjeta     : '+parametro);
-  writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
-  writeln(archCardNet,'APROBADA        : EN LINEA');
-  //writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
-  //writeln(archCardNet,'');
-  writeln(archCardNet,'');
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-  writeln(archCardNet,'Monto RD$       : '+ parametro);
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-  writeln(archCardNet,'Itbis RD$       : '+parametro);
-  parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-  writeln(archCardNet,'Total RD$       : '+parametro);
-  //writeln(archCardNet,'');
-  //writeln(archCardNet,'');
-  writeln(archCardNet,DM.CENTRO('APROBADA'));
- // writeln(archCardNet,'');
- // writeln(archCardNet,'');
- // writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
-  writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
-  writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
- // writeln(archCardNet,'Hora             : '+trim(copy(b['Transaction']['DataTime'].getStr,12,20)));
-  //writeln(archCardNet,'');
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('***Copia Cliente***'));
-  writeln(archCardNet,'');
-  writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
+      for x:= 1 to 2 do begin
+      writeln(archCardNet,'');
+      end;
 
-  for x:= 1 to 2 do begin
-  writeln(archCardNet,'');
-  end;
+      if codigoabre = 'Termica' then
+      writeln(archCardNet,chr(27)+chr(109));
 
-  if codigoabre = 'Termica' then
-  writeln(archCardNet,chr(27)+chr(109));
+      CloseFile(archCardNet);
 
-  CloseFile(archCardNet);
+     winexec('.\tverifoneCopia.bat',0);
 
- winexec('.\tverifoneCopia.bat',0);
+     vl_respverifone := '';
+     vl_tarjeta := '';
+   end
+   else
+   begin
+      // Obtener la cadena completa de la fecha y hora
+      FechaHora := b['Transaction']['DataTime'].getStr;
+      // Extraer la fecha (primeros 10 caracteres: "18/11/2024")
+      Fecha := Copy(FechaHora, 1, 10);
+      // Extraer la hora (desde el carï¿½cter 12 hasta el final: "12:48:21 p. m.")
+      Hora := Copy(FechaHora, 12, Length(FechaHora) - 11);
+      // Crear una cadena con fecha a la izquierda y hora a la derecha
+      Linea := Format('%-20s %20s', [Fecha, Hora]);
+      //Pago con tarjeta extranjera
+      closefile(puertopeqCardNet);
+      AssignFile(archCardNet, '.\impverifone.bat');
+      rewrite(archCardNet);
+      writeln(archCardNet, 'type .\tverifone.txt > '+vp_puerto);
+      closefile(archCardNet);
 
- vl_respverifone := '';
- vl_tarjeta := '';
+      //Ticket Comercio
+      AssignFile(archCardNet, '.\tverifone.txt');
+      rewrite(archCardNet);
+      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
+      writeln(archCardNet,dm.centro(parametro));
+      writeln(archCardNet, dm.centro('Telf(s):' + qImpCardNet.FieldByName('emp_telefono').Text));
+      writeln(archCardNet, dm.centro('Lote No:'+ copy(b['Batch'].getStr, 1, 24)));
+      writeln(archCardNet, dm.centro('RNC:' + qImpCardNet.FieldByName('emp_rnc').Text));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro(b['Card']['CardNumber'].getStr));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('VENTA CON DCC'));
+      writeln(archCardNet,'');
+      Writeln(archCardNet, Linea);
+      writeln(archCardNet,'');
+      // Formatear la salida con IT a la izquierda y el nï¿½mero de referencia a la derecha
+      LineaCard := Format('%-20s %20s',
+      ['IT: ' + b['Card']['Product'].getStr,'No. REF: ' + b['Transaction']['Reference'].getStr]);
+      Writeln(archCardNet, LineaCard);
+      writeln(archCardNet,'APROBACION                     '+b['Transaction']['AuthorizationNumber'].getStr);
+      writeln(archCardNet,'');
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
+      writeln(archCardNet,'COMPRA                    RD$: '+ parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
+      writeln(archCardNet,'ITBIS                     RD$: '+parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
 
+      writeln(archCardNet,'                          ==================');
+      writeln(archCardNet,'MONTO                     RD$: '+parametro);
+      writeln(archCardNet,'');
+      writeln(archCardNet,'RRN: '+b['Transaction']['RetrievalReference'].getStr);
+      writeln(archCardNet,'');
 
-end;
+      // Extraer el valor bruto de DisplayRate
+      DisplayRateRaw := b['DynamicCurrencyConversion']['DisplayRate'].getStr;
+
+      // Convertirlo a un nï¿½mero real dividiendo por 100,000
+      DisplayRateReal := StrToFloat(DisplayRateRaw) / 1000000000;
+
+      Writeln(archCardNet,dm.centro(Format('TASA DE CAMBIO: 1 USD = %.5f', [DisplayRateReal])));
+
+      // Extraer el margen bruto
+      MarginRateRaw := b['DynamicCurrencyConversion']['MarginRate'].getStr;
+      // Convertirlo a un porcentaje dividiendo por 100
+      MarginRatePercent := StrToFloat(MarginRateRaw) / 100;
+
+      Writeln(archCardNet,dm.centro(Format('Rate Include %.2f%% Int 1 Margin', [MarginRatePercent])));
+      Writeln(archCardNet, dm.centro(Format('Moneda Transacción: %s', [b['DynamicCurrencyConversion']['TransactionCurrency'].getStr])));
+
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value/DisplayRateReal);
+      writeln(archCardNet,'TOTAL TRANSACCION USD: '+parametro);
+      writeln(archCardNet,'');
+
+      writeln(archCardNet,dm.centro('[x]Me han ofrecido una seleccion de monedas,'));
+      writeln(archCardNet,dm.centro('incluyendo moneda local del comerciante'));
+      writeln(archCardNet,dm.centro('y decidi pagar en USD'));
+
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('Conversion Dinamica de Moneda (DCC)'));
+      writeln(archCardNet,dm.centro('es ofrecido por el Establecimiento'));
+
+      writeln(archCardNet,'');
+      writeln(archCardNet,'Terminal : '+b['TerminalID'].getStr);
+      writeln(archCardNet,'');
+      writeln(archCardNet,DM.CENTRO('*APROBADA*'));
+      writeln(archCardNet,DM.CENTRO('*Cliente*'));
+      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Original Comercio***'));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Recuerde conservar su comprobante***'));
+
+      for x:= 1 to 2 do begin
+      writeln(archCardNet,'');
+      end;
+
+      if codigoabre = 'Termica' then
+      writeln(archCardNet,chr(27)+chr(109));
+
+      CloseFile(archCardNet);
+
+     winexec('.\impverifone.bat',0);
+
+     //Ticket Copia
+      AssignFile(archCardNet, '.\tverifoneCopia.bat');
+      rewrite(archCardNet);
+      writeln(archCardNet, 'type .\tverifoneCopia.txt > '+vp_puerto);
+      closefile(archCardNet);
+
+      AssignFile(archCardNet, '.\tverifoneCopia.txt');
+      rewrite(archCardNet);
+      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
+      writeln(archCardNet,dm.centro(parametro));
+      writeln(archCardNet, dm.centro('Telf(s):' + qImpCardNet.FieldByName('emp_telefono').Text));
+      writeln(archCardNet, dm.centro('Lote No:'+ copy(b['Batch'].getStr, 1, 24)));
+      writeln(archCardNet, dm.centro('RNC:' + qImpCardNet.FieldByName('emp_rnc').Text));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro(b['Card']['CardNumber'].getStr));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('VENTA CON DCC'));
+      writeln(archCardNet,'');
+      Writeln(archCardNet, Linea);
+      writeln(archCardNet,'');
+      // Formatear la salida con IT a la izquierda y el nï¿½mero de referencia a la derecha
+      LineaCard := Format('%-20s %20s',
+      ['IT: ' + b['Card']['Product'].getStr,'No. REF: ' + b['Transaction']['Reference'].getStr]);
+      Writeln(archCardNet, LineaCard);
+      writeln(archCardNet,'APROBACION                     '+b['Transaction']['AuthorizationNumber'].getStr);
+      writeln(archCardNet,'');
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
+      writeln(archCardNet,'COMPRA                    RD$: '+ parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
+      writeln(archCardNet,'ITBIS                     RD$: '+parametro);
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
+
+      writeln(archCardNet,'                          ==================');
+      writeln(archCardNet,'MONTO                     RD$: '+parametro);
+      writeln(archCardNet,'');
+      writeln(archCardNet,'RRN: '+b['Transaction']['RetrievalReference'].getStr);
+      writeln(archCardNet,'');
+
+      // Extraer el valor bruto de DisplayRate
+      DisplayRateRaw := b['DynamicCurrencyConversion']['DisplayRate'].getStr;
+
+      // Convertirlo a un nï¿½mero real dividiendo por 100,000
+      DisplayRateReal := StrToFloat(DisplayRateRaw) / 1000000000;
+
+      Writeln(archCardNet,dm.centro(Format('TASA DE CAMBIO: 1 USD = %.5f', [DisplayRateReal])));
+
+      // Extraer el margen bruto
+      MarginRateRaw := b['DynamicCurrencyConversion']['MarginRate'].getStr;
+      // Convertirlo a un porcentaje dividiendo por 100
+      MarginRatePercent := StrToFloat(MarginRateRaw) / 100;
+
+      Writeln(archCardNet,dm.centro(Format('Rate Include %.2f%% Int 1 Margin', [MarginRatePercent])));
+      Writeln(archCardNet, dm.centro(Format('Moneda Transacciï¿½n: %s', [b['DynamicCurrencyConversion']['TransactionCurrency'].getStr])));
+
+      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value/DisplayRateReal);
+      writeln(archCardNet,'TOTAL TRANSACCION USD: '+parametro);
+      writeln(archCardNet,'');
+
+      writeln(archCardNet,dm.centro('[x]Me han ofrecido una seleccion de monedas,'));
+      writeln(archCardNet,dm.centro('incluyendo moneda local del comerciante'));
+      writeln(archCardNet,dm.centro('y decidi pagar en USD'));
+
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('Conversion Dinamica de Moneda (DCC)'));
+      writeln(archCardNet,dm.centro('es ofrecido por el Establecimiento'));
+
+      writeln(archCardNet,'');
+      writeln(archCardNet,'Terminal : '+b['TerminalID'].getStr);
+      writeln(archCardNet,'');
+      writeln(archCardNet,DM.CENTRO('*APROBADA*'));
+      writeln(archCardNet,DM.CENTRO('*Cliente*'));
+      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Copia Cliente***'));
+      writeln(archCardNet,'');
+      writeln(archCardNet,dm.centro('***Recuerde conservar su comprobante***'));
+
+      for x:= 1 to 2 do begin
+      writeln(archCardNet,'');
+      end;
+
+      if codigoabre = 'Termica' then
+      writeln(archCardNet,chr(27)+chr(109));
+
+      CloseFile(archCardNet);
+
+     winexec('.\tverifoneCopia.bat',0);
+
+     vl_respverifone := '';
+     vl_tarjeta := '';
+   end;
+ end;
+
 end;
 end;
 
@@ -8079,7 +9756,6 @@ begin
   codigo := dm.Query1.FieldByName('codigo_abre_caja').AsString;
   puerto := dm.Query1.FieldByName('Puerto').AsString;
   puerto2 := dm.Query1.FieldByName('codigo_abre_caja_tipo').AsString;
-
 
   if codigo = 'FISCAL' then begin
   OpenCashDrawerFiscal(Impresora)
@@ -8273,6 +9949,20 @@ end;
 function TfrmMain.ImprimeTicketFiscal(
   ImpresoraFiscal: TImpresora): boolean;
 begin
+    {dm.Query1.Close;
+      dm.Query1.SQL.Clear;
+      dm.Query1.SQL.Add('select Puerto, codigo_abre_caja, codigo_abre_caja_tipo Puerto2 from cajas_IP');
+      dm.Query1.SQL.Add('where caja = :caj');
+      dm.Query1.Parameters.ParamByName('caj').Value := edCaja.Caption;
+      dm.Query1.Open;
+      Puerto := DM.Query1.FieldByName('Puerto').AsString;
+      Puerto2 := DM.Query1.FieldByName('Puerto2').AsString;
+
+        if Puerto2 = 'E'  then
+        pnabrircaja2;
+        if Puerto2 = 'T'  then
+        pnabrircaja2;}
+
   puedeAbrirCaja :=false;
   //Verifica a ver si tiene pago efetivo
   QFormaPago.DisableControls;
@@ -8707,7 +10397,7 @@ begin
 
         if ((Impresora.StatusControladorFiscal[2] = '1') or (Impresora.StatusControladorFiscal[11] = '1') or (Impresora.StatusControladorFiscal[12] = '1')) then
           begin
-             Application.MessageBox(pchar('Error en mecanismo de impresión'+#13+#12+'Verifique papel'),'Error',MB_OK+MB_ICONERROR);
+             Application.MessageBox(pchar('Error en mecanismo de impresiï¿½n'+#13+#12+'Verifique papel'),'Error',MB_OK+MB_ICONERROR);
             result :=true;
           end;
 
@@ -9506,9 +11196,9 @@ begin
     //apertura de la factura
     case QTicketNCF_Tipo.Value of
       1:SendCmd(Stat, Err, PChar('/0'));    //Factura Para Consumidor Final
-      2:SendCmd(Stat, Err, PChar('/1'));     //Factura Para Crédito Fiscal
+      2:SendCmd(Stat, Err, PChar('/1'));     //Factura Para Crï¿½dito Fiscal
       3:SendCmd(Stat, Err, PChar('/1'));     ////Gubernamental
-      4:SendCmd(Stat, Err, PChar('/4'));    ////Regimen Especial (Factura Para Crédito Fiscal con Exoneración ITBIS)
+      4:SendCmd(Stat, Err, PChar('/4'));    ////Regimen Especial (Factura Para Crï¿½dito Fiscal con Exoneraciï¿½n ITBIS)
     end;
   //   Showmessage('Estoy en Bixolon ---> 2.4');
   dgeneral := true;
@@ -9642,10 +11332,10 @@ begin
   begin
     v_TotalPagado:= v_TotalPagado + QFormaPagopagado.Value;
         {
-            ‘01’ = EFECTIVO       ‘02’ = CHEQUE   ‘03’ = TJTA. DE CRED.
-            ‘04’ = TJTA. DE DEB.  ‘05’ = NOTA DE  CREDITO
-            ‘06’ = CUPON          ‘07’ = VENTA A CREDITO   ‘08’ = OTROS 1
-            ‘09’ = OTROS 2        ‘10’ = OTROS 3
+            ï¿½01ï¿½ = EFECTIVO       ï¿½02ï¿½ = CHEQUE   ï¿½03ï¿½ = TJTA. DE CRED.
+            ï¿½04ï¿½ = TJTA. DE DEB.  ï¿½05ï¿½ = NOTA DE  CREDITO
+            ï¿½06ï¿½ = CUPON          ï¿½07ï¿½ = VENTA A CREDITO   ï¿½08ï¿½ = OTROS 1
+            ï¿½09ï¿½ = OTROS 2        ï¿½10ï¿½ = OTROS 3
         }
     if QFormaPagoforma.AsString = 'CHE' then   //CHEQUE
       SendCmd(Stat, Err, PChar('202'+FormatFloat('000000000000', QFormaPagopagado.Value*100)))
@@ -9844,14 +11534,14 @@ end;
         exit;
       end;
 
-  //Obtiene los datos de fiscalización
+  //Obtiene los datos de fiscalizaciï¿½n
     err := DriverFiscal1.IF_WRITE('@GetInitData');
-    //Obtiene las características fiscales
+    //Obtiene las caracterï¿½sticas fiscales
     err := DriverFiscal1.IF_WRITE('@GetFiscalFeatures');
-    //Obtiene los datos de serialización
+    //Obtiene los datos de serializaciï¿½n
     err := DriverFiscal1.IF_WRITE('@GetPrinterVersion');
 
-   //Retorna los valores de respuesta del último comprobante cerrado
+   //Retorna los valores de respuesta del ï¿½ltimo comprobante cerrado
     err := DriverFiscal1.IF_WRITE('@GetLastTicketStatus');
     //arrayMultiUso[17]
 
@@ -9875,7 +11565,7 @@ end;
   parametro := IntToStr(b['Transaction']['Reference'].getInt);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'No. Trans.      : '+parametro);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'');
-  err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+dm.centro('REGISTRO DE LA TRANSACCION'));
+  err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+dm.centro('REGISTRO ImpTicketFiscalCardNet DE LA TRANSACCION'));
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'No. de Terminal : '+b['TerminalID'].getStr);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'ID Comerciante  : '+b['MerchantID'].getStr);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'');
@@ -9933,14 +11623,14 @@ end;
         exit;
       end;
 
-  //Obtiene los datos de fiscalización
+  //Obtiene los datos de fiscalizaciï¿½n
     err := DriverFiscal1.IF_WRITE('@GetInitData');
-    //Obtiene las características fiscales
+    //Obtiene las caracterï¿½sticas fiscales
     err := DriverFiscal1.IF_WRITE('@GetFiscalFeatures');
-    //Obtiene los datos de serialización
+    //Obtiene los datos de serializaciï¿½n
     err := DriverFiscal1.IF_WRITE('@GetPrinterVersion');
 
-   //Retorna los valores de respuesta del último comprobante cerrado
+   //Retorna los valores de respuesta del ï¿½ltimo comprobante cerrado
     err := DriverFiscal1.IF_WRITE('@GetLastTicketStatus');
     //arrayMultiUso[17]
 
@@ -9965,7 +11655,7 @@ end;
   parametro := IntToStr(b['Transaction']['Reference'].getInt);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'No. Trans.      : '+parametro);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'');
-  err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+dm.centro('REGISTRO DE LA TRANSACCION'));
+  err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+dm.centro('REGISTRO ImpTicketFiscalCardNet DE LA TRANSACCION'));
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'No. de Terminal : '+b['TerminalID'].getStr);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'ID Comerciante  : '+b['MerchantID'].getStr);
   err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+'');
@@ -10077,7 +11767,7 @@ end;
   parametro := IntToStr(b['Transaction']['Reference'].getInt);
   err :=  DriverFiscal1.LineaComentario( 'No. Trans.      : '+parametro);
   err :=  DriverFiscal1.LineaComentario( '');
-  err :=  DriverFiscal1.LineaComentario( dm.centro('REGISTRO DE LA TRANSACCION'));
+  err :=  DriverFiscal1.LineaComentario( dm.centro('REGISTRO ImpTicketVmaxFiscalCardNet DE LA TRANSACCION'));
   err :=  DriverFiscal1.LineaComentario( 'No. de Terminal : '+b['TerminalID'].getStr);
   err :=  DriverFiscal1.LineaComentario( 'ID Comerciante  : '+b['MerchantID'].getStr);
   err :=  DriverFiscal1.LineaComentario( '');
@@ -10143,27 +11833,73 @@ var
   puerto:String;
   err: integer;
 
-  procedure Epson();
+  procedure Epson;
+var
+  DriverFiscal: TDriverFiscal;
+  err: Integer;
+  puertoCaja: Integer;
+begin
+
+dm.Query1.Close;
+  dm.Query1.SQL.Clear;
+  dm.Query1.SQL.Add('select puerto, Redondea, pregunta_imprimir from cajas_IP');
+  dm.Query1.SQL.Add('where caja = :caj');
+  dm.Query1.Parameters.ParamByName('caj').Value := edCaja.Caption;
+  dm.Query1.Open;
+
+  if (dm.Query1.FieldByName('puerto').AsString = 'COM1') then
+    puertoCaja :=1
+  else
+    puertoCaja := 2;
+  Puerto := PuertoSerial[Impresora.Puerto -1];
+  
+  //puertoCaja := puerto; // Asegï¿½rate de establecer el puerto correcto aquï¿½
+  DriverFiscal := TDriverFiscal.Create(nil);
+  try
+    DriverFiscal.SerialNumber := 'P4YF100122';
+    ShowMessage('puertoCaja : ' + IntToStr(puertoCaja));
+    err := DriverFiscal.IF_OPEN('COM1', 9600); // Asumiendo que la velocidad es 9600
+    if err = 0 then
+    begin
+      err := DriverFiscal.IF_WRITE('@OpenDrawer|COM1');//+ IntToStr(puertoCaja));
+      // Verifica si hubo error al enviar el comando
+      if err <> 0 then
+        ShowMessage('Error al abrir la caja: ' + IntToStr(err));
+    end
+    else
+      ShowMessage('Error al abrir puerto: ' + IntToStr(err));
+  finally
+    DriverFiscal.IF_CLOSE;
+    DriverFiscal.Free;
+  end;
+end;
+
+ { procedure Epson();
   var
+  Stat: Integer;
+   Respuesta: Boolean;
     DriverFiscal1 : TDriverFiscal;
   begin
     DriverFiscal1 := TDriverFiscal.Create(Self);
-    DriverFiscal1.SerialNumber := '27-0163848-435';
+    DriverFiscal1.SerialNumber := 'P4YF100122';
     try
       err := DriverFiscal1.IF_OPEN(puerto, vPrinterFiscal.Velocidad);
+     // MessageDlg('ABRIR CAJA 8 '  +IntToStr(puertoCaja),mtError,[mbok],0);
+
       err := DriverFiscal1.IF_WRITE('@OpenDrawer|'+IntToStr(puertoCaja));
       err := DriverFiscal1.IF_CLOSE;
     finally
       DriverFiscal1.Destroy;
     end;
   end;
-
+          }
   procedure Tecnologia_Tfhkaif();
    //cubre las BIXOLON/HKA80
    Var
      Stat: Integer;
      Respuesta: Boolean;
   begin
+
     OpenFpctrl(PChar(Puerto));
     try
       Respuesta := CheckFprinter();
@@ -10215,6 +11951,27 @@ procedure TfrmMain.QFormaPagoNewRecord(DataSet: TDataSet);
 begin
 QFormaPagoemp_codigo.Value := empcaja;
 QFormaPagosuc_codigo.Value := vp_suc;
+end;
+
+procedure TfrmMain.ScanTimerTimer(Sender: TObject);
+begin
+  { ScanTimer.Enabled := False; // Desactiva el temporizador
+   
+ // Solo simula Enter si el texto no estï¿½ vacï¿½o y contiene solo nï¿½meros
+  if (edproducto.Text <> '') and IsStrANumber(edproducto.Text) and (edproducto.Focused) then
+  begin
+    PostMessage(edproducto.Handle, WM_KEYDOWN, VK_RETURN, 0);
+   // PostMessage(edproducto.Handle, WM_KEYUP, VK_RETURN, 0);
+  end;
+  }
+end;
+
+// Funciï¿½n para validar si el texto es un nï¿½mero
+function TfrmMain.IsStrANumber(const S: string): Boolean;
+var
+  Value: Double;
+begin
+  Result := TryStrToFloat(S, Value);
 end;
 
 end.

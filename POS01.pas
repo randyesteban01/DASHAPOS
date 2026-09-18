@@ -218,6 +218,9 @@ type
     QParametrospar_Marca_Printer: TStringField;
     QParametrospar_puerto_Printer: TStringField;
     QParametrospar_velocidad_Printer: TIntegerField;
+    QParametrosUsa_FacturacionElectronica: TBooleanField;
+    QParametrosImprimirCopia: TBooleanField;
+    QParametrosPAR_FE_DetenerFacturacion: TBooleanField;
     procedure ADOSIGMABeforeConnect(Sender: TObject);
     procedure DataModuleCreate(Sender: TObject);
     procedure GrabaLogCardNet(emp, suc, usu, facticket:Integer;resultado, tipo, tipofacticket:String;monto,itbis:Double);
@@ -230,6 +233,7 @@ type
     Usuario : integer;
     NomUsuario, Puerto, Puerto2 : string;
     function  Centro (Texto : String) : String;
+    function CentroModifed (Texto : String) : String;
     function getFechaServidor: TDatetime;
     function getFechaServidor2: TDatetime;
     function validaSerie(vPro_codigo,vSer_numero: string):boolean;
@@ -267,6 +271,19 @@ begin
     if not IsEmpty then
       Result :=dm.adoMultiUso['fecha'];
   end;
+end;
+
+function TDM.CentroModifed(Texto: String): String;
+var
+  a : integer;
+  l : String;
+begin
+  l := '';
+  for a := 1 to Trunc((38 - length(trim(texto))) / 2) do
+  begin
+    l := l + ' ';
+  end;
+  Result := l + trim(texto);
 end;
 
 function TDM.Centro(Texto: String): String;
@@ -434,12 +451,12 @@ end;
 
 function TDM.PAD(Mchar, Alineacion: char; tamano: Integer;
   Numero: String): string;
-{**-[Esta función es para rellenar una cadena con un valor recibido a un
-     tamaño dado recibe como parámetro lo sigte :
+{**-[Esta funciï¿½n es para rellenar una cadena con un valor recibido a un
+     tamaï¿½o dado recibe como parï¿½metro lo sigte :
      Mchar:Es un carater cualquiera.
-     Tamaño :Es el tamaño al cual sera combertida la cadena
-     Número :Es la cadena enviada
-     Tiene como resultado una cadena con el tamaño dado < S >  ]-**}
+     Tamaï¿½o :Es el tamaï¿½o al cual sera combertida la cadena
+     Nï¿½mero :Es la cadena enviada
+     Tiene como resultado una cadena con el tamaï¿½o dado < S >  ]-**}
 
 var S:String;
 begin
@@ -495,6 +512,8 @@ begin
       begin   //2
         if not QParametrospar_Marca_Printer.IsNull then
           begin //--[2.1]--
+          if Trim(QParametrospar_Marca_Printer.AsString) <> '' then
+          begin
             Close;
             Sql.clear();
             sql.add('Select IDPrinter,Nombre,Tipo,Precioconitbis From Printers');
@@ -517,7 +536,8 @@ begin
                   Velocidad := dm.QParametrospar_velocidad_Printer.value ;
               end;
             end; //--[2.1.1]--
-          end;  //--[2.1]--
+          end;
+          end; //--[2.1]--
 
         end; //2
       end;
@@ -555,26 +575,26 @@ end;
 
 function TDM.RPad(pCadena: string; pLong: word; pRelleno: string): string;
 begin
-{Inicialización}
+{Inicializaciï¿½n}
 result := pCadena;
 
 while Length(result) < pLong do
 result := result + pRelleno;
 
-{Como el resultado podría tener más de "pLong" caracteres, lo recortamos.}
+{Como el resultado podrï¿½a tener mï¿½s de "pLong" caracteres, lo recortamos.}
 if Length(pCadena) <= pLong then
 result := Copy(result, 1, pLong);
 end;
 
 function TDM.LPad(pCadena: string; pLong: word; pRelleno: string): string;
 begin
-{Inicialización}
+{Inicializaciï¿½n}
 result := pCadena;
 
 while Length(result) < pLong do
 result := pRelleno + result;
 
-{Como el resultado podría tener más de "pLong" caracteres, lo recortamos.}
+{Como el resultado podrï¿½a tener mï¿½s de "pLong" caracteres, lo recortamos.}
 if Length(pCadena) <= pLong then
 result := Copy(result, 1, pLong);
 end;

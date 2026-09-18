@@ -1,14 +1,14 @@
 object frmMain: TfrmMain
-  Left = 319
-  Top = 121
+  Left = 403
+  Top = 214
   Action = actBuscarPeso
   ActiveControl = edproducto
   BiDiMode = bdLeftToRight
   BorderIcons = []
   BorderStyle = bsSingle
   Caption = 'DASHA POS'
-  ClientHeight = 581
-  ClientWidth = 1011
+  ClientHeight = 554
+  ClientWidth = 1004
   Color = clWhite
   Font.Charset = ANSI_CHARSET
   Font.Color = clWindowText
@@ -3680,9 +3680,9 @@ object frmMain: TfrmMain
       object Label2: TLabel
         Left = 8
         Top = 13
-        Width = 33
+        Width = 41
         Height = 13
-        Caption = 'Cliente'
+        Caption = 'Cliente::'
       end
       object btBuscaCli: TSpeedButton
         Left = 148
@@ -3995,8 +3995,8 @@ object frmMain: TfrmMain
   end
   object Panel4: TPanel
     Left = 0
-    Top = 413
-    Width = 1011
+    Top = 386
+    Width = 1004
     Height = 168
     Align = alBottom
     ParentBackground = False
@@ -6145,8 +6145,66 @@ object frmMain: TfrmMain
         Value = Null
       end>
     SQL.Strings = (
-      'Select *'
-      'From montos_ticket'
+      'SELECT f.[usu_codigo]'
+      '      ,[fecha]'
+      '      ,[caja]'
+      '      ,[ticket]'
+      '      ,[total]'
+      '      ,[descuento]'
+      '      ,[sorteo]'
+      '      ,[tksorteo]'
+      '      ,[NCF_Fijo]'
+      '      ,[NCF_Secuencia]'
+      '      ,[itbis]'
+      '      ,[nombre]'
+      '      ,[rnc]'
+      '      ,[status]'
+      '      ,[mov_numero]'
+      '      ,[NCF_Tipo]'
+      '      ,[fecha_hora]'
+      '      ,[usuario_original]'
+      '      ,[ticket_original]'
+      '      ,[caja_original]'
+      '      ,[Devuelto]'
+      '      ,[Boletos]'
+      '      ,[Cuadre]'
+      '      ,[supervisor]'
+      '      ,[Domicilio]'
+      '      ,[telefono_domicilio]'
+      '      ,[nombre_domicilio]'
+      '      ,f.[emp_codigo]'
+      '      ,[exento]'
+      '      ,[grabado]'
+      '      ,[tfa_codigo]'
+      '      ,f.[tip_codigo]'
+      '      ,[cli_codigo]'
+      '      ,[ven_codigo]'
+      '      ,[porciento_com]'
+      '      ,[tk_Monto_comision]'
+      '      ,[tk_conitbis]'
+      '      ,[TK_abono]'
+      '      ,[cli_telefono]'
+      '      ,[cli_direccion]'
+      '      ,[cli_Descuento]'
+      '      ,[mon_nif]'
+      '      ,[porc_desc_gral]'
+      '      ,[Tdesc_gral]'
+      '      ,[NIF]'
+      '      ,[SUC_CODIGO]'
+      '      ,[cantidad]'
+      '      ,[pagado]'
+      '      ,[Enviado_DGII]'
+      '      ,[eNCF]'
+      '      ,[codigoseguridad]'
+      '      ,[fechafirma]'
+      '      ,[Error_DGII]'
+      '      ,[FechaLimitePago]'
+      '      ,[AceptadoDGII],'
+      #9'   E.emp_rnc,  t.cod_dgii as TipoeNCF'
+      ''
+      '  FROM [dbo].[Montos_Ticket] f'
+      '   INNER JOIN Empresas E ON E.emp_codigo=F.emp_codigo'
+      'LEFT join TipoNCF t on t.tip_codigo=f.tip_codigo'
       'Where caja   = :caj  and ticket = :tik')
     Left = 56
     Top = 296
@@ -6325,6 +6383,17 @@ object frmMain: TfrmMain
     end
     object QTicketsuc_codigo: TIntegerField
       FieldName = 'suc_codigo'
+    end
+    object QTicketTipoeNCF: TIntegerField
+      FieldName = 'TipoeNCF'
+    end
+    object QTicketemp_rnc: TStringField
+      FieldName = 'emp_rnc'
+      Size = 50
+    end
+    object QTicketeNCF: TStringField
+      FieldName = 'eNCF'
+      Size = 100
     end
   end
   object dsDetalle: TDataSource
@@ -7165,14 +7234,16 @@ object frmMain: TfrmMain
       'set @caj  = :caj'
       'set @usu  = :usu'
       ''
-      'select for_veriphone_desc json,pagado monto, '
+      'select for_veriphone_desc json,fp.pagado monto, '
       
-        '((pagado/case when t.itbis = 0 then 1 else (1.18) end))*case whe' +
-        'n t.itbis = 0 then 0 else 0.18 end monto_itbis, '
+        '((fp.pagado/case when t.itbis = 0 then 1 else (1.18) end))*case ' +
+        'when t.itbis = 0 then 0 else 0.18 end monto_itbis, '
       
-        'pagado/case when t.itbis = 0 then 1 else (1.18) end montosinitbi' +
-        's,'
-      's.emp_nombre sucursal, s.emp_direccion direccion'
+        'fp.pagado/case when t.itbis = 0 then 1 else (1.18) end montosini' +
+        'tbis,'
+      
+        's.emp_nombre sucursal, s.emp_direccion direccion, s.emp_telefono' +
+        ', s.emp_rnc '
       'from formas_pago_ticket fp'
       
         'inner join montos_ticket t on fp.ticket=t.ticket and fp.fecha = ' +
@@ -7288,6 +7359,43 @@ object frmMain: TfrmMain
         'WHERE P.PRO_CONTROLADO = '#39'TRUE'#39' AND PR.EMP_CODIGO = :EMP and P.P' +
         'RO_CODIGO = :PRO')
     Left = 296
+    Top = 232
+  end
+  object ConsExistencia: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    AfterInsert = QSerieAfterInsert
+    OnNewRecord = QSerieNewRecord
+    Parameters = <>
+    SQL.Strings = (
+      'select ser_secuencia,ser_numero,producto, ticket,tic_secuencia'
+      ' from #TicSerie'
+      'where ticket= :ticket'
+      'and producto= :producto'
+      'and tic_secuencia= :secuencia')
+    Left = 232
+    Top = 384
+  end
+  object ConstAlmacen: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    AfterInsert = QSerieAfterInsert
+    OnNewRecord = QSerieNewRecord
+    Parameters = <>
+    SQL.Strings = (
+      'select ser_secuencia,ser_numero,producto, ticket,tic_secuencia'
+      ' from #TicSerie'
+      'where ticket= :ticket'
+      'and producto= :producto'
+      'and tic_secuencia= :secuencia')
+    Left = 280
+    Top = 384
+  end
+  object ScanTimer: TTimer
+    Enabled = False
+    Interval = 200
+    OnTimer = ScanTimerTimer
+    Left = 392
     Top = 232
   end
 end

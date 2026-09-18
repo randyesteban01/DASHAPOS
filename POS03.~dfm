@@ -226,10 +226,10 @@ object frmAcceso: TfrmAcceso
   end
   object btHuella: TBitBtn
     Left = 32
-    Top = 424
-    Width = 273
-    Height = 45
-    Caption = 'Huella'
+    Top = 368
+    Width = 105
+    Height = 49
+    Caption = 'Reintentar huella'
     Font.Charset = ANSI_CHARSET
     Font.Color = clNavy
     Font.Height = -13
@@ -286,32 +286,17 @@ object frmAcceso: TfrmAcceso
     Left = 8
     Top = 8
     Width = 321
-    Height = 25
+    Height = 40
     Alignment = taCenter
     AutoSize = False
     Caption = 'Digite la clave del Supervisor'
+    WordWrap = True
     Font.Charset = ANSI_CHARSET
     Font.Color = clWindowText
     Font.Height = -21
     Font.Name = 'Tahoma'
     Font.Style = [fsBold]
     ParentFont = False
-  end
-  object lbHuella: TLabel
-    Left = 8
-    Top = 32
-    Width = 321
-    Height = 16
-    Alignment = taCenter
-    AutoSize = False
-    Caption = 'Coloque el dedo en el lector'
-    Font.Charset = ANSI_CHARSET
-    Font.Color = clNavy
-    Font.Height = -12
-    Font.Name = 'Tahoma'
-    Font.Style = [fsBold]
-    ParentFont = False
-    Visible = False
   end
   object Image1: TImage
     Left = 89

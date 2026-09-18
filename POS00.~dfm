@@ -1,14 +1,14 @@
 object frmMain: TfrmMain
-  Left = 341
-  Top = 206
+  Left = 403
+  Top = 214
   Action = actBuscarPeso
   ActiveControl = edproducto
   BiDiMode = bdLeftToRight
   BorderIcons = []
   BorderStyle = bsSingle
   Caption = 'DASHA POS'
-  ClientHeight = 581
-  ClientWidth = 1011
+  ClientHeight = 554
+  ClientWidth = 1004
   Color = clWhite
   Font.Charset = ANSI_CHARSET
   Font.Color = clWindowText
@@ -30,7 +30,7 @@ object frmMain: TfrmMain
     Left = 839
     Top = 0
     Width = 164
-    Height = 417
+    Height = 396
     Picture.Data = {
       0A544A504547496D616765D6380100FFD8FFE000104A46494600010101005000
       500000FFEE000E41646F626500640000000001FFE121D24578696600004D4D00
@@ -2538,6 +2538,29 @@ object frmMain: TfrmMain
       01401FFFD9}
     Stretch = True
   end
+  object lblEstado: TLabel
+    Left = 851
+    Top = 398
+    Width = 92
+    Height = 13
+    Caption = 'Estado del Printer :'
+  end
+  object lblStatusPrinter: TLabel
+    Left = 947
+    Top = 398
+    Width = 20
+    Height = 13
+    Hint = 'Doble click para  reconectar printer'
+    Caption = 'OFF'
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clRed
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+    ParentShowHint = False
+    ShowHint = True
+  end
   object DBGrid1: TDBGrid
     Left = 0
     Top = 208
@@ -3657,9 +3680,9 @@ object frmMain: TfrmMain
       object Label2: TLabel
         Left = 8
         Top = 13
-        Width = 33
+        Width = 41
         Height = 13
-        Caption = 'Cliente'
+        Caption = 'Cliente::'
       end
       object btBuscaCli: TSpeedButton
         Left = 148
@@ -3972,18 +3995,18 @@ object frmMain: TfrmMain
   end
   object Panel4: TPanel
     Left = 0
-    Top = 413
-    Width = 1011
+    Top = 386
+    Width = 1004
     Height = 168
     Align = alBottom
     ParentBackground = False
     ParentColor = True
     TabOrder = 4
     object Image4: TImage
-      Left = 803
-      Top = 47
-      Width = 129
-      Height = 125
+      Left = 795
+      Top = 37
+      Width = 136
+      Height = 127
       Picture.Data = {
         055449636F6E000001000100808000000100180028C800001600000028000000
         8000000000010000010018000000000000C80000000000000000000000000000
@@ -5588,6 +5611,7 @@ object frmMain: TfrmMain
         FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         FFFFFFFF}
+      Stretch = True
     end
     object pnefectivo: TPanel
       Left = 5
@@ -5806,8 +5830,8 @@ object frmMain: TfrmMain
       OnClick = pnreimprimirClick
     end
     object pnalunatk: TPanel
-      Left = 389
-      Top = 48
+      Left = 797
+      Top = 8
       Width = 137
       Height = 41
       BorderStyle = bsSingle
@@ -5821,6 +5845,7 @@ object frmMain: TfrmMain
       ParentBackground = False
       ParentFont = False
       TabOrder = 12
+      Visible = False
       OnClick = pnalunatkClick
     end
     object pndescuento: TPanel
@@ -6004,8 +6029,8 @@ object frmMain: TfrmMain
       OnClick = pndomicilioClick
     end
     object pSerie: TPanel
-      Left = 797
-      Top = 8
+      Left = 389
+      Top = 48
       Width = 137
       Height = 41
       BorderStyle = bsSingle
@@ -6059,25 +6084,46 @@ object frmMain: TfrmMain
     TabOrder = 7
     Visible = False
   end
-  object oposscale1: TOPOSScale1
-    Left = 416
-    Top = 256
+  object OPOSScale1: TOPOSScale
+    Left = 496
+    Top = 296
     Width = 32
     Height = 32
     ControlData = {00090000D8130000D8130000}
   end
-  object OPOSScanner11: TOPOSScanner1
-    Left = 408
+  object OPOSScanner1: TOPOSScanner
+    Left = 504
     Top = 304
     Width = 32
     Height = 32
     ControlData = {00090000D8130000D8130000}
   end
+  object pnMsgImpresion: TPanel
+    Left = 208
+    Top = 280
+    Width = 577
+    Height = 89
+    TabOrder = 10
+    Visible = False
+    object lblWait: TLabel
+      Left = 29
+      Top = 32
+      Width = 319
+      Height = 29
+      Alignment = taCenter
+      Caption = 'Buscando puerto, espere...'
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clRed
+      Font.Height = -24
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
   object QTicket: TADOQuery
     Connection = DM.ADOSIGMA
     CursorType = ctStatic
     LockType = ltBatchOptimistic
-    AfterOpen = QTicketAfterOpen
     BeforePost = QTicketBeforePost
     OnCalcFields = QTicketCalcFields
     OnNewRecord = QTicketNewRecord
@@ -6099,8 +6145,66 @@ object frmMain: TfrmMain
         Value = Null
       end>
     SQL.Strings = (
-      'Select *'
-      'From montos_ticket'
+      'SELECT f.[usu_codigo]'
+      '      ,[fecha]'
+      '      ,[caja]'
+      '      ,[ticket]'
+      '      ,[total]'
+      '      ,[descuento]'
+      '      ,[sorteo]'
+      '      ,[tksorteo]'
+      '      ,[NCF_Fijo]'
+      '      ,[NCF_Secuencia]'
+      '      ,[itbis]'
+      '      ,[nombre]'
+      '      ,[rnc]'
+      '      ,[status]'
+      '      ,[mov_numero]'
+      '      ,[NCF_Tipo]'
+      '      ,[fecha_hora]'
+      '      ,[usuario_original]'
+      '      ,[ticket_original]'
+      '      ,[caja_original]'
+      '      ,[Devuelto]'
+      '      ,[Boletos]'
+      '      ,[Cuadre]'
+      '      ,[supervisor]'
+      '      ,[Domicilio]'
+      '      ,[telefono_domicilio]'
+      '      ,[nombre_domicilio]'
+      '      ,f.[emp_codigo]'
+      '      ,[exento]'
+      '      ,[grabado]'
+      '      ,[tfa_codigo]'
+      '      ,f.[tip_codigo]'
+      '      ,[cli_codigo]'
+      '      ,[ven_codigo]'
+      '      ,[porciento_com]'
+      '      ,[tk_Monto_comision]'
+      '      ,[tk_conitbis]'
+      '      ,[TK_abono]'
+      '      ,[cli_telefono]'
+      '      ,[cli_direccion]'
+      '      ,[cli_Descuento]'
+      '      ,[mon_nif]'
+      '      ,[porc_desc_gral]'
+      '      ,[Tdesc_gral]'
+      '      ,[NIF]'
+      '      ,[SUC_CODIGO]'
+      '      ,[cantidad]'
+      '      ,[pagado]'
+      '      ,[Enviado_DGII]'
+      '      ,[eNCF]'
+      '      ,[codigoseguridad]'
+      '      ,[fechafirma]'
+      '      ,[Error_DGII]'
+      '      ,[FechaLimitePago]'
+      '      ,[AceptadoDGII],'
+      #9'   E.emp_rnc,  t.cod_dgii as TipoeNCF'
+      ''
+      '  FROM [dbo].[Montos_Ticket] f'
+      '   INNER JOIN Empresas E ON E.emp_codigo=F.emp_codigo'
+      'LEFT join TipoNCF t on t.tip_codigo=f.tip_codigo'
       'Where caja   = :caj  and ticket = :tik')
     Left = 56
     Top = 296
@@ -6277,6 +6381,20 @@ object frmMain: TfrmMain
       Size = 30
       Calculated = True
     end
+    object QTicketsuc_codigo: TIntegerField
+      FieldName = 'suc_codigo'
+    end
+    object QTicketTipoeNCF: TIntegerField
+      FieldName = 'TipoeNCF'
+    end
+    object QTicketemp_rnc: TStringField
+      FieldName = 'emp_rnc'
+      Size = 50
+    end
+    object QTicketeNCF: TStringField
+      FieldName = 'eNCF'
+      Size = 100
+    end
   end
   object dsDetalle: TDataSource
     DataSet = qDetalle
@@ -6298,6 +6416,7 @@ object frmMain: TfrmMain
     Connection = DM.ADOSIGMA
     CursorType = ctStatic
     LockType = ltBatchOptimistic
+    OnNewRecord = QFormaPagoNewRecord
     Parameters = <
       item
         Name = 'caj'
@@ -6320,7 +6439,8 @@ object frmMain: TfrmMain
       'caja, usu_codigo, fecha, ticket, forma, pagado,'
       
         'devuelta, empresa, credito, cliente, banco, documento, for_verip' +
-        'hone_desc'
+        'hone_desc,'
+      'emp_codigo, suc_codigo'
       'from'
       'formas_pago_ticket'
       'where'
@@ -6375,6 +6495,12 @@ object frmMain: TfrmMain
     object QFormaPagofor_veriphone_desc: TStringField
       FieldName = 'for_veriphone_desc'
       Size = 2500
+    end
+    object QFormaPagoemp_codigo: TIntegerField
+      FieldName = 'emp_codigo'
+    end
+    object QFormaPagosuc_codigo: TIntegerField
+      FieldName = 'suc_codigo'
     end
   end
   object QOferta: TADOQuery
@@ -6839,6 +6965,7 @@ object frmMain: TfrmMain
     BeforePost = qDetalleBeforePost
     AfterPost = QDetalleAfterPost
     OnCalcFields = QDetalleCalcFields
+    OnNewRecord = qDetalleNewRecord
     Parameters = <
       item
         Name = 'caj'
@@ -6864,7 +6991,9 @@ object frmMain: TfrmMain
       'devuelta, Realizo_Oferta, Oferta,'
       'Patrocinador, fam_codigo,'
       'dep_codigo, sup_codigo, ger_codigo, gon_codigo,'
-      'col_codigo, mar_codigo, recargo,pro_serializado, alm_codigo'
+      
+        'col_codigo, mar_codigo, recargo,pro_serializado, alm_codigo, emp' +
+        '_codigo, suc_codigo'
       'from'
       'ticket'
       'where'
@@ -7009,6 +7138,12 @@ object frmMain: TfrmMain
     object qDetallealm_codigo: TIntegerField
       FieldName = 'alm_codigo'
     end
+    object qDetalleemp_codigo: TIntegerField
+      FieldName = 'emp_codigo'
+    end
+    object qDetallesuc_codigo: TIntegerField
+      FieldName = 'suc_codigo'
+    end
   end
   object qSecuencia: TADOQuery
     Connection = DM.ADOSIGMA
@@ -7099,23 +7234,168 @@ object frmMain: TfrmMain
       'set @caj  = :caj'
       'set @usu  = :usu'
       ''
+      'select for_veriphone_desc json,fp.pagado monto, '
       
-        'select for_veriphone_desc json,pagado monto, case when t.itbis =' +
-        ' 0 then 0 else t.itbis end monto_itbis, t.total-t.itbis montosin' +
-        'itbis,'
-      's.emp_nombre sucursal, s.emp_direccion direccion'
+        '((fp.pagado/case when t.itbis = 0 then 1 else (1.18) end))*case ' +
+        'when t.itbis = 0 then 0 else 0.18 end monto_itbis, '
+      
+        'fp.pagado/case when t.itbis = 0 then 1 else (1.18) end montosini' +
+        'tbis,'
+      
+        's.emp_nombre sucursal, s.emp_direccion direccion, s.emp_telefono' +
+        ', s.emp_rnc '
       'from formas_pago_ticket fp'
       
         'inner join montos_ticket t on fp.ticket=t.ticket and fp.fecha = ' +
         't.fecha and fp.caja=t.caja and fp.usu_codigo = t.usu_codigo'
       'inner join Parametros p on t.emp_codigo = p.emp_codigo'
       'inner join empresas s on t.emp_codigo = s.emp_codigo'
-      'where isnull(for_veriphone_desc,'#39#39')<>'#39#39
+      'where len(isnull(for_veriphone_desc,'#39#39'))>180'
       
         'and s.emp_codigo = @emp and fp.ticket = @tic and fp.caja = @caj ' +
         'and fp.fecha = @fec and fp.usu_codigo = @usu'
       'and isnull(fp.for_veriphone_desc,'#39#39')<>'#39#39)
     Left = 160
     Top = 288
+  end
+  object MDLista: TdxMemData
+    Indexes = <>
+    SortOptions = []
+    Left = 713
+    Top = 251
+    object MDListaLProducto: TIntegerField
+      FieldName = 'LProducto'
+    end
+  end
+  object dsMDLista: TDataSource
+    AutoEdit = False
+    DataSet = MDLista
+    Left = 761
+    Top = 267
+  end
+  object tmVerificaPuerto: TTimer
+    Enabled = False
+    Interval = 30000
+    Left = 8
+    Top = 232
+  end
+  object qVerVentaGobierno: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    LockType = ltBatchOptimistic
+    Parameters = <
+      item
+        Name = 'CED'
+        Attributes = [paNullable]
+        DataType = ftString
+        NumericScale = 255
+        Precision = 255
+        Size = 30
+        Value = Null
+      end
+      item
+        Name = 'EMP'
+        Attributes = [paSigned, paNullable]
+        DataType = ftInteger
+        Precision = 10
+        Size = 4
+        Value = Null
+      end
+      item
+        Name = 'PRO'
+        Attributes = [paSigned, paNullable]
+        DataType = ftInteger
+        Precision = 10
+        Size = 4
+        Value = Null
+      end>
+    SQL.Strings = (
+      'SELECT MT.RNC, MT.NOMBRE, T.PRODUCTO, T.descripcion, T.cantidad '
+      'FROM MONTOS_TICKET MT'
+      
+        'INNER JOIN TICKET T ON MT.TICKET=T.TICKET AND MT.FECHA=T.FECHA A' +
+        'ND MT.CAJA=T.CAJA AND MT.USU_CODIGO = T.USU_CODIGO'
+      
+        'INNER JOIN CAJAS_IP C ON MT.CAJA = C.CAJA AND MT.EMP_CODIGO = C.' +
+        'EMP_CODIGO'
+      'INNER JOIN PARAMETROS PR ON MT.EMP_CODIGO = PR.EMP_CODIGO'
+      
+        'INNER JOIN PRODUCTOS P ON T.PRODUCTO=P.PRO_CODIGO AND PR.PAR_INV' +
+        'EMPRESA = P.EMP_CODIGO'
+      
+        'WHERE P.PRO_CONTROLADO = '#39'TRUE'#39' AND MT.RNC = :CED AND MT.EMP_COD' +
+        'IGO = :EMP and T.PRODUCTO = :PRO'
+      'AND MT.FECHA = CAST(CAST(GETDATE() AS CHAR(11)) AS DATETIME)'
+      'AND STATUS= '#39'FAC'#39)
+    Left = 256
+    Top = 232
+  end
+  object qCantComboInespre: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    LockType = ltBatchOptimistic
+    Parameters = <
+      item
+        Name = 'EMP'
+        Attributes = [paSigned]
+        DataType = ftInteger
+        Precision = 10
+        Size = 4
+        Value = Null
+      end
+      item
+        Name = 'PRO'
+        Attributes = [paSigned]
+        DataType = ftInteger
+        Precision = 10
+        Size = 4
+        Value = Null
+      end>
+    SQL.Strings = (
+      'SELECT P.pro_nombre, P.pro_controlado'
+      'FROM PARAMETROS PR '
+      'INNER JOIN PRODUCTOS P ON PR.PAR_INVEMPRESA = P.EMP_CODIGO'
+      
+        'WHERE P.PRO_CONTROLADO = '#39'TRUE'#39' AND PR.EMP_CODIGO = :EMP and P.P' +
+        'RO_CODIGO = :PRO')
+    Left = 296
+    Top = 232
+  end
+  object ConsExistencia: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    AfterInsert = QSerieAfterInsert
+    OnNewRecord = QSerieNewRecord
+    Parameters = <>
+    SQL.Strings = (
+      'select ser_secuencia,ser_numero,producto, ticket,tic_secuencia'
+      ' from #TicSerie'
+      'where ticket= :ticket'
+      'and producto= :producto'
+      'and tic_secuencia= :secuencia')
+    Left = 232
+    Top = 384
+  end
+  object ConstAlmacen: TADOQuery
+    Connection = DM.ADOSIGMA
+    CursorType = ctStatic
+    AfterInsert = QSerieAfterInsert
+    OnNewRecord = QSerieNewRecord
+    Parameters = <>
+    SQL.Strings = (
+      'select ser_secuencia,ser_numero,producto, ticket,tic_secuencia'
+      ' from #TicSerie'
+      'where ticket= :ticket'
+      'and producto= :producto'
+      'and tic_secuencia= :secuencia')
+    Left = 280
+    Top = 384
+  end
+  object ScanTimer: TTimer
+    Enabled = False
+    Interval = 200
+    OnTimer = ScanTimerTimer
+    Left = 392
+    Top = 232
   end
 end

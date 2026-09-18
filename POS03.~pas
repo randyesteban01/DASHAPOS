@@ -27,7 +27,6 @@ type
     btmenos: TSpeedButton;
     btmas: TSpeedButton;
     lbtitulo: TLabel;
-    lbHuella: TLabel;
     Image1: TImage;
     btHuella: TBitBtn;
     tmAutoHuella: TTimer;
@@ -56,9 +55,6 @@ type
     procedure tmAutoHuellaTimer(Sender: TObject);
   private
     procedure IntentarAutorizarHuella;
-    procedure ConfigurarLayoutHuella(Activo: Boolean);
-    procedure AjustarPosicionTeclado(Offset: Integer);
-    function MensajeErrorHuellaAmigable(const Msg: string): string;
   public
     LetraTotal : string;
     acepto : integer;
@@ -199,114 +195,33 @@ begin
   acepto := 0;
 end;
 
-function TfrmAcceso.MensajeErrorHuellaAmigable(const Msg: string): string;
-var
-  T: string;
-begin
-  T := UpperCase(Trim(Msg));
-  if (Pos('ZKFPM_INIT', T) > 0) or (Pos('NO SE PUDO INICIALIZAR', T) > 0) then
-    Result := 'El lector de huellas no responde.' + #13#10 + #13#10 +
-      'Verifique que este conectado por USB, que los drivers ZKTeco esten ' +
-      'instalados y que las DLL esten junto al programa.'
-  else if (Pos('TIMEOUT', T) > 0) or (Pos('TIEMPO DE ESPERA', T) > 0) then
-    Result := 'Tiempo de espera agotado.' + #13#10 + #13#10 +
-      'Coloque el dedo en el lector e intente de nuevo.'
-  else if Pos('HUELLA NO RECONOCIDA', T) > 0 then
-    Result := 'Huella no reconocida.' + #13#10 + #13#10 +
-      'Ningun supervisor registrado coincide con esa huella.'
-  else if Pos('NO HAY SUPERVISORES CON HUELLA', T) > 0 then
-    Result := 'No hay supervisores con huella registrada.' + #13#10 + #13#10 +
-      'Registre la huella en mantenimiento o use la clave del supervisor.'
-  else if Pos('ERROR:', T) = 1 then
-    Result := 'No se pudo leer la huella.' + #13#10 + #13#10 +
-      'Verifique el lector e intente de nuevo, o digite la clave.'
-  else if Msg <> '' then
-    Result := Msg
-  else
-    Result := 'No se pudo verificar la huella.';
-end;
-
-procedure TfrmAcceso.AjustarPosicionTeclado(Offset: Integer);
-begin
-  bt7.Top := 200 + Offset;
-  bt8.Top := 200 + Offset;
-  bt9.Top := 200 + Offset;
-  btast.Top := 200 + Offset;
-  btborra.Top := 200 + Offset;
-  bt4.Top := 256 + Offset;
-  bt5.Top := 256 + Offset;
-  bt6.Top := 256 + Offset;
-  btmenos.Top := 256 + Offset;
-  SpeedButton15.Top := 256 + Offset;
-  bt1.Top := 312 + Offset;
-  bt2.Top := 312 + Offset;
-  bt3.Top := 312 + Offset;
-  btmas.Top := 312 + Offset;
-  bt0.Top := 368 + Offset;
-  btpunto.Top := 368 + Offset;
-end;
-
-procedure TfrmAcceso.ConfigurarLayoutHuella(Activo: Boolean);
-const
-  OFFSET_HUELLA = 20;
-begin
-  if Activo then
-  begin
-    lbtitulo.SetBounds(8, 8, 321, 22);
-    lbtitulo.Caption := 'Huella o clave de supervisor';
-    lbtitulo.Font.Height := -16;
-
-    lbHuella.SetBounds(8, 32, 321, 16);
-    lbHuella.Caption := 'Coloque el dedo en el lector';
-    lbHuella.Visible := True;
-
-    Image1.Top := 52;
-    edclave.Top := 180;
-    AjustarPosicionTeclado(OFFSET_HUELLA);
-    btigual.SetBounds(200, 368 + OFFSET_HUELLA, 105, 49);
-    btHuella.SetBounds(32, 424 + OFFSET_HUELLA, 273, 45);
-    btHuella.Caption := 'Huella';
-    btHuella.Visible := True;
-    ClientHeight := 492;
-
-    lbtitulo.BringToFront;
-    lbHuella.BringToFront;
-  end
-  else
-  begin
-    lbtitulo.SetBounds(8, 8, 321, 25);
-    lbtitulo.Font.Height := -21;
-    lbHuella.Visible := False;
-
-    Image1.Top := 32;
-    edclave.Top := 160;
-    AjustarPosicionTeclado(0);
-    btigual.SetBounds(144, 368, 161, 49);
-    btHuella.Visible := False;
-    ClientHeight := 448;
-  end;
-end;
-
 procedure TfrmAcceso.FormShow(Sender: TObject);
 var
   EsSupervisor: Boolean;
 begin
   EsSupervisor := Pos('SUPERVISOR', UpperCase(lbtitulo.Caption)) > 0;
-  ConfigurarLayoutHuella(UsaHuellaSupervisor and EsSupervisor);
+  btHuella.Visible := UsaHuellaSupervisor and EsSupervisor;
+  lbtitulo.Font.Color := clWindowText;
+
   if btHuella.Visible then
+  begin
+    lbtitulo.Caption := 'Coloque el dedo en el lector' + #13#10 +
+      'o digite la clave del supervisor';
+    btHuella.Caption := 'Reintentar huella';
     tmAutoHuella.Enabled := True;
+  end;
 end;
 
 procedure TfrmAcceso.IntentarAutorizarHuella;
 var
   UsuCodigo: Integer;
   ClaveSup, Msg: string;
-  TipoMsg: TMsgDlgType;
 begin
   if not btHuella.Visible then
     Exit;
 
-  lbHuella.Caption := 'Esperando huella...';
+  lbtitulo.Caption := 'Esperando huella en el lector...';
+  lbtitulo.Font.Color := clNavy;
   Application.ProcessMessages;
 
   if IdentificarSupervisorPorHuella(UsuCodigo, ClaveSup, Msg, True) then
@@ -318,22 +233,12 @@ begin
   end
   else
   begin
-    lbHuella.Caption := 'Coloque el dedo en el lector';
-
     if Msg <> '' then
-    begin
-      if (Pos('ERROR:', UpperCase(Msg)) > 0) or
-         (Pos('ZKFPM_INIT', UpperCase(Msg)) > 0) then
-        TipoMsg := mtError
-      else
-        TipoMsg := mtWarning;
-
-      MessageDlg(
-        MensajeErrorHuellaAmigable(Msg) + #13#10 + #13#10 +
-        'Pulse Huella para reintentar o digite la clave.',
-        TipoMsg, [mbOK], 0);
-    end;
-
+      lbtitulo.Caption := Msg + #13#10 + 'Reintente la huella o digite la clave.'
+    else
+      lbtitulo.Caption := 'Huella no reconocida.' + #13#10 +
+        'Reintente o digite la clave.';
+    lbtitulo.Font.Color := clMaroon;
     edclave.SetFocus;
   end;
 end;

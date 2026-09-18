@@ -196,7 +196,8 @@ var
     arch, ptocaja : textfile;
   s, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11 : array[0..100] of char;
   TFac, MontoItbis, Venta, Efectivo, Tarjeta, Cheque, Credito, TGrabado,
-  TExcento, TCancelados, Anulados, MontoExento, BonosClub, BonosOtros, Devolucion, Total : double;
+  TExcento, TCancelados, Anulados, MontoExento, BonosClub, BonosOtros, Devolucion, Total,
+  TotalEfectivo : double;
   PuntosPrinc, FactorPrin, Puntos, TotalPuntos, devuelta : Double;
   Msg1, Msg2, Msg3, Msg4, Puerto, forma, tipo_cuadre, Cuadrar_Empresa : String;
   cantcredito, cantcontado, cancelados, boletos, empresa_caja : integer;
@@ -1394,7 +1395,8 @@ var
   arch, ptocaja : textfile;
   s, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11 : array[0..100] of char;
   TFac, MontoItbis, Venta, Efectivo, Tarjeta, Cheque, Credito, TGrabado,
-  TExcento, TCancelados, Anulados, MontoExento, BonosClub, BonosOtros, Devolucion, Total : double;
+  TExcento, TCancelados, Anulados, MontoExento, BonosClub, BonosOtros, Devolucion, Total,
+  TotalEfectivo : double;
   PuntosPrinc, FactorPrin, Puntos, TotalPuntos, devuelta : Double;
   Msg1, Msg2, Msg3, Msg4, Puerto, forma, tipo_cuadre, Cuadrar_Empresa : String;
   cantcredito, cantcontado, cancelados, boletos, empresa_caja : integer;
@@ -2307,6 +2309,8 @@ begin
     writeln(arch, 'TKS ANULADOS  : '+s+dm.Query1.FieldByName('cantidad').AsString);
     writeln(arch, 'TOTAL EN CAJA : '+s3+format('%n',[(Efectivo+Tarjeta+Cheque+Credito+BonosClub+BonosOtros+QCuadreefectivo_asignado.Value) - devuelta]));
 
+    TotalEfectivo := Efectivo;
+
     if TotalDesgloce > 0 then
     begin
       writeln(arch, '');
@@ -2335,11 +2339,11 @@ begin
       s1 := '';
       FillChar(s1, 28-length(Format('%n',[frmDesgloce.QMontosValor.AsFloat - TotalDesgloce])),' ');
       s2 := '';
-      FillChar(s2, 29-length(Format('%n',[((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta) - TotalDesgloce])),' ');
+      FillChar(s2, 29-length(Format('%n',[TotalEfectivo - TotalDesgloce])),' ');
 
       writeln(arch, '---------------------------------------');
       writeln(arch, 'T O T A L  '+s+Format('%n',[TotalDesgloce]));
-      writeln(arch, 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - ((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta)]));
+      writeln(arch, 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - TotalEfectivo]));
       writeln(arch, '');
     end;
 
@@ -3315,6 +3319,8 @@ begin
     err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ 'TKS ANULADOS  : '+s+dm.Query1.FieldByName('cantidad').AsString);
     err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ 'TOTAL EN CAJA : '+s3+format('%n',[(Efectivo+Tarjeta+Cheque+Credito+BonosClub+BonosOtros+QCuadreefectivo_asignado.Value) - devuelta]));
 
+    TotalEfectivo := Efectivo;
+
     if TotalDesgloce > 0 then
     begin
       err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ '');
@@ -3343,11 +3349,11 @@ begin
       s1 := '';
       FillChar(s1, 28-length(Format('%n',[frmDesgloce.QMontosValor.AsFloat - TotalDesgloce])),' ');
       s2 := '';
-      FillChar(s2, 29-length(Format('%n',[((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta) - TotalDesgloce])),' ');
+      FillChar(s2, 29-length(Format('%n',[TotalEfectivo - TotalDesgloce])),' ');
 
       err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ '---------------------------------------');
       err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ 'T O T A L  '+s+Format('%n',[TotalDesgloce]));
-      err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - ((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta)]));
+      err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - TotalEfectivo]));
       err := DriverFiscal1.IF_WRITE('@PrintNonFiscalText|'+ '');
     end;
 
@@ -3380,10 +3386,10 @@ var
 begin
 
 {
-configurará la impresora en Modo Fast Food
+configurarï¿½ la impresora en Modo Fast Food
 Respuesta = SendCmd(status, error, "PJ3200")
 
-configurará la impresora en Modo Retail
+configurarï¿½ la impresora en Modo Retail
 Respuesta = SendCmd(status, error, "PJ3201")
 }
   Puerto := PuertoSerial[Impresora.Puerto -1];
@@ -4247,6 +4253,8 @@ Respuesta = SendCmd(status, error, "PJ3201")
     SendCmd(Stat, Err, PChar('800'+ 'TKS ANULADOS  : '+s+dm.Query1.FieldByName('cantidad').AsString));
     SendCmd(Stat, Err, PChar('800'+ 'TOTAL EN CAJA : '+s3+format('%n',[(Efectivo+Tarjeta+Cheque+Credito+BonosClub+BonosOtros+QCuadreefectivo_asignado.Value) - devuelta])));
 
+    TotalEfectivo := Efectivo;
+
     if TotalDesgloce > 0 then
     begin
       SendCmd(Stat, Err, PChar('800'+ ''));
@@ -4275,11 +4283,11 @@ Respuesta = SendCmd(status, error, "PJ3201")
       s1 := '';
       FillChar(s1, 28-length(Format('%n',[frmDesgloce.QMontosValor.AsFloat - TotalDesgloce])),' ');
       s2 := '';
-      FillChar(s2, 29-length(Format('%n',[((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta) - TotalDesgloce])),' ');
+      FillChar(s2, 29-length(Format('%n',[TotalEfectivo - TotalDesgloce])),' ');
 
       SendCmd(Stat, Err, PChar('800'+ '---------------------------------------'));
       SendCmd(Stat, Err, PChar('800'+ 'T O T A L  '+s+Format('%n',[TotalDesgloce])));
-      SendCmd(Stat, Err, PChar('800'+ 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - ((Efectivo + Tarjeta + Cheque + BonosClub + BonosOtros) - Devuelta)])));
+      SendCmd(Stat, Err, PChar('800'+ 'DIFERENCIA '+s2+Format('%n',[TotalDesgloce - TotalEfectivo])));
       SendCmd(Stat, Err, PChar('800'+ ''));
     end;
 

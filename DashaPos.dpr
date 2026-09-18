@@ -18,6 +18,7 @@ uses
   POS13 in 'POS13.pas' {frmEliminar},
   POS14 in 'POS14.pas' {frmClientes},
   POS15 in 'POS15.pas' {frmConfig},
+  POSHuella in 'POSHuella.pas',
   POS16 in 'POS16.pas' {frmDesccuento},
   POS17 in 'POS17.pas' {frmReporteVentas},
   POS18 in 'POS18.pas' {frmDesgloce},
@@ -29,7 +30,8 @@ uses
   POS24 in 'POS24.pas' {RTicket: TQuickRep},
   POS25 in 'POS25.pas' {frmSeleccionCliente},
   PVENTA185 in 'PVENTA185.pas' {frmBuscaRNC},
-  POS27 in 'POS27.pas' {frmSerie};
+  POS27 in 'POS27.pas' {frmSerie},
+  FacturacionElectronicaDGII_TLB in 'C:\Program Files (x86)\Borland\Delphi7\Imports\FacturacionElectronicaDGII_TLB.pas';
 
 {$R *.res}
 
