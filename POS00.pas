@@ -2663,13 +2663,14 @@ end;
                       IntToStr(QTicketTipoeNCF.Value)
                     );
                   end;
-                     //ShowMessage('Resultado: ' + resultado);
+                     if (Pos('Error', resultado) > 0) or (Pos('ERROR', resultado) > 0) then
+                       ShowMessage(resultado);
 
                   //resultado := Servicio.ProbarConexion(); // si tienes un m�todo de prueba o conexi�n
                  // ShowMessage('Respuesta: ' + resultado);
               except
                 on E: Exception do
-                 // ShowMessage('Error: ' + E.Message);
+                  ShowMessage('Error DGII POS: ' + E.Message);
               end;
               end;
              end;
@@ -3203,13 +3204,14 @@ end;
                       IntToStr(QTicketTipoeNCF.Value)
                     );
                   end;
-                     //ShowMessage('Resultado: ' + resultado);
+                     if (Pos('Error', resultado) > 0) or (Pos('ERROR', resultado) > 0) then
+                       ShowMessage(resultado);
 
                   //resultado := Servicio.ProbarConexion(); // si tienes un m�todo de prueba o conexi�n
                  // ShowMessage('Respuesta: ' + resultado);
               except
                 on E: Exception do
-                 // ShowMessage('Error: ' + E.Message);
+                  ShowMessage('Error DGII POS: ' + E.Message);
               end;
               end;
              end;
@@ -3681,13 +3683,14 @@ end;
                       IntToStr(QTicketTipoeNCF.Value)
                     );
                   end;
-                     //ShowMessage('Resultado: ' + resultado);
+                     if (Pos('Error', resultado) > 0) or (Pos('ERROR', resultado) > 0) then
+                       ShowMessage(resultado);
 
                   //resultado := Servicio.ProbarConexion(); // si tienes un m�todo de prueba o conexi�n
                  // ShowMessage('Respuesta: ' + resultado);
               except
                 on E: Exception do
-                 // ShowMessage('Error: ' + E.Message);
+                  ShowMessage('Error DGII POS: ' + E.Message);
               end;
               end;
              end;
@@ -4323,13 +4326,14 @@ end;
                       IntToStr(QTicketTipoeNCF.Value)
                     );
                   end;
-                     //ShowMessage('Resultado: ' + resultado);
+                     if (Pos('Error', resultado) > 0) or (Pos('ERROR', resultado) > 0) then
+                       ShowMessage(resultado);
 
                   //resultado := Servicio.ProbarConexion(); // si tienes un m�todo de prueba o conexi�n
                  // ShowMessage('Respuesta: ' + resultado);
               except
                 on E: Exception do
-                 // ShowMessage('Error: ' + E.Message);
+                  ShowMessage('Error DGII POS: ' + E.Message);
               end;
               end;
              end;
@@ -6690,13 +6694,14 @@ begin
                       IntToStr(QTicketTipoeNCF.Value)
                     );
                   end;
-                     //ShowMessage('Resultado: ' + resultado);
+                     if (Pos('Error', resultado) > 0) or (Pos('ERROR', resultado) > 0) then
+                       ShowMessage(resultado);
 
                   //resultado := Servicio.ProbarConexion(); // si tienes un m�todo de prueba o conexi�n
                  // ShowMessage('Respuesta: ' + resultado);
               except
                 on E: Exception do
-                 // ShowMessage('Error: ' + E.Message);
+                  ShowMessage('Error DGII POS: ' + E.Message);
               end;
               end;
              end;
