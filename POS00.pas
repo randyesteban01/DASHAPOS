@@ -2247,7 +2247,7 @@ procedure TfrmMain.pnefectivoClick(Sender: TObject);
 var
   ncf_fijo : string;
   prox: Int64;
-  Servicio: FacturaElectronicaService;
+  Servicio: OleVariant;
   resultado: WideString;
   ok: Boolean;
   msg: string;
@@ -2635,7 +2635,7 @@ end;
 
                   IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
                   begin
-                    Servicio := CoFacturaElectronicaService.Create;
+                    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaResumenPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -2650,7 +2650,7 @@ end;
                   end
                   else
                   begin
-                  Servicio := CoFacturaElectronicaService.Create;
+                  Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaElectronicaPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -2803,7 +2803,7 @@ var
   ncf : integer;
   ncf_fijo : string;
    prox: Int64;
-  Servicio: FacturaElectronicaService;
+  Servicio: OleVariant;
   resultado: WideString;
   ok: Boolean;
   msg: string;
@@ -3176,7 +3176,7 @@ end;
 
                   IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
                   begin
-                    Servicio := CoFacturaElectronicaService.Create;
+                    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaResumenPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -3191,7 +3191,7 @@ end;
                   end
                   else
                   begin
-                  Servicio := CoFacturaElectronicaService.Create;
+                  Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaElectronicaPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -3284,7 +3284,7 @@ var
   ncf : integer;
   ncf_fijo : string;
    prox: Int64;
-  Servicio: FacturaElectronicaService;
+  Servicio: OleVariant;
   resultado: WideString;
   ok: Boolean;
   msg: string;
@@ -3655,7 +3655,7 @@ end;
 
                   IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
                   begin
-                    Servicio := CoFacturaElectronicaService.Create;
+                    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaResumenPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -3670,7 +3670,7 @@ end;
                   end
                   else
                   begin
-                  Servicio := CoFacturaElectronicaService.Create;
+                  Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaElectronicaPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -3754,7 +3754,7 @@ var
   vence : tdatetime;
   ano, mes, dia : word;
    prox: Int64;
-  Servicio: FacturaElectronicaService;
+  Servicio: OleVariant;
   resultado: WideString;
   ok: Boolean;
   msg: string;
@@ -4298,7 +4298,7 @@ end;
 
                   IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
                   begin
-                    Servicio := CoFacturaElectronicaService.Create;
+                    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaResumenPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -4313,7 +4313,7 @@ end;
                   end
                   else
                   begin
-                  Servicio := CoFacturaElectronicaService.Create;
+                  Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaElectronicaPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -6281,7 +6281,7 @@ var
   vence : tdatetime;
   ncf_fijo, tdo : string;
     prox: Int64;
-  Servicio: FacturaElectronicaService;
+  Servicio: OleVariant;
   resultado: WideString;
   ok: Boolean;
   msg: string;
@@ -6666,7 +6666,7 @@ begin
 
                   IF (QTickettotal.Value<=250000) and (QTicketTipoeNCF.Value=32) then
                   begin
-                    Servicio := CoFacturaElectronicaService.Create;
+                    Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaResumenPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
@@ -6681,7 +6681,7 @@ begin
                   end
                   else
                   begin
-                  Servicio := CoFacturaElectronicaService.Create;
+                  Servicio := CreateOleObject('FacturacionElectronicaDGII.FacturaElectronicaService');
                       resultado := Servicio.EnviarFacturaElectronicaPOS(
                       IntToStr(QTicketemp_codigo.Value),
                       IntToStr(QTicketsuc_codigo.Value),
