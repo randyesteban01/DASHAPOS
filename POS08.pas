@@ -126,6 +126,30 @@ var
 
   tamount, ttax, othertax : Integer;
 begin
+  Exit; //Anulacion deshabilitada: no se permite anular desde el sistema
+  //No se permite anular un ticket ya enviado a la DGII
+  dm.Query1.Close;
+  dm.Query1.SQL.Clear;
+  dm.Query1.SQL.Add('select isnull(Enviado_DGII,0) as Enviado_DGII, isnull(AceptadoDGII,0) as AceptadoDGII');
+  dm.Query1.SQL.Add('from montos_ticket');
+  dm.Query1.SQL.Add('where caja = :caj');
+  dm.Query1.SQL.Add('and usu_codigo = :usu');
+  dm.Query1.SQL.Add('and fecha = convert(datetime, :fec, 105)');
+  dm.Query1.SQL.Add('and ticket = :tik');
+  dm.Query1.Parameters.ParamByName('usu').Value    := QTicketusu_codigo.Value;
+  dm.Query1.Parameters.ParamByName('fec').DataType := ftDate;
+  dm.Query1.Parameters.ParamByName('fec').Value    := QTicketfecha.Value;
+  dm.Query1.Parameters.ParamByName('caj').Value    := QTicketcaja.Value;
+  dm.Query1.Parameters.ParamByName('tik').Value    := QTicketticket.Value;
+  dm.Query1.Open;
+  if dm.Query1.FieldByName('Enviado_DGII').AsBoolean
+  or dm.Query1.FieldByName('AceptadoDGII').AsBoolean then
+  begin
+    MessageDlg('ESTE TICKET YA FUE ENVIADO A LA DGII, NO PUEDE ANULARSE.'+#13+
+               'Para corregirlo debe emitirse una nota de credito.',mtError,[mbok],0);
+    Exit;
+  end;
+
   if MessageDlg('ESTA SEGURO QUE DESEA ANULAR ESTE TICKET?',mtConfirmation,[mbyes,mbno],0) = mryes then
   begin
         dm.Query1.Close;

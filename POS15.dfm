@@ -234,6 +234,7 @@ object frmConfig: TfrmConfig
       Height = 58
       Cancel = True
       Caption = '[F2] ANULAR'
+      Visible = False
       Font.Charset = ANSI_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
