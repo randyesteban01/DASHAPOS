@@ -848,6 +848,7 @@ end;
 
 procedure TfrmConfig.BitBtn10Click(Sender: TObject);
 begin
+  Exit; //Anulacion deshabilitada: no se permite anular desde el sistema
   Application.CreateForm(tfrmAcceso, frmAcceso);
   frmAcceso.lbtitulo.Caption := 'Digite la clave del Supervisor';
   frmAcceso.ShowModal;

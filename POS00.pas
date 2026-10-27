@@ -4544,6 +4544,22 @@ begin
         dm.Query1.Parameters.ParamByName('tik').Value    := QTicketticket.Value;
         dm.Query1.ExecSQL;
 
+        //Cancelar es antes de facturar: el ticket queda CAN, no ANU (anulado es despues de facturado)
+        dm.Query1.Close;
+        dm.Query1.SQL.Clear;
+        dm.Query1.SQL.Add('update montos_ticket set status = '+QuotedStr('CAN'));
+        dm.Query1.SQL.Add('where caja = :caj');
+        dm.Query1.SQL.Add('and usu_codigo = :usu');
+        dm.Query1.SQL.Add('and fecha = convert(datetime, :fec, 105)');
+        dm.Query1.SQL.Add('and ticket = :tik');
+        dm.Query1.SQL.Add('and status = '+QuotedStr('ANU'));
+        dm.Query1.Parameters.ParamByName('caj').Value    := StrToInt(edcaja.Caption);
+        dm.Query1.Parameters.ParamByName('usu').Value    := dm.Usuario;
+        dm.Query1.Parameters.ParamByName('fec').DataType := ftDate;
+        dm.Query1.Parameters.ParamByName('fec').Value    := DM.getFechaServidor;
+        dm.Query1.Parameters.ParamByName('tik').Value    := QTicketticket.Value;
+        dm.Query1.ExecSQL;
+
         QFormaPago.Close;
         if forma_numeracion = 1 then
         begin
@@ -4607,6 +4623,7 @@ end;
 
 procedure TfrmMain.pnalunatkClick(Sender: TObject);
 begin
+  Exit; //Anulacion deshabilitada: no se permite anular desde el sistema
   Application.CreateForm(tfrmAcceso, frmAcceso);
   frmAcceso.lbtitulo.Caption := 'Digite la clave del Supervisor';
   frmAcceso.ShowModal;
