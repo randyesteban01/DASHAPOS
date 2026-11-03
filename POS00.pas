@@ -9385,381 +9385,338 @@ end;
 
 procedure TfrmMain.ImpTicketCardNet;
 var
-  archCardNet, puertopeqCardNet : textfile;
-  s, s1, s2, s3, s4, s5,s6 : array [0..20] of char;
-  Tfac, Saldo : double;
-  vp_puerto, lbitbis, impcodigo, parametro, Unidad, codigoabre : string;
-  a,x : integer;
+  arch, fpuerto : TextFile;
+  vp_puerto, codigoabre, jsonTxt, sPuerto : string;
   b : myJSONItem;
-  FieldExists: Boolean;
-  FieldName: string;
-  JSONString: string;
-  FechaHora: string;
-  Fecha: string;
-  Hora: string;
-  Linea,LineaCard: string;
-  DisplayRateRaw: string;
-  DisplayRateReal: Double;
-  MarginRateRaw: string;
-  MarginRatePercent: Double;
+  esDCC : Boolean;
+  dccBloque, dccMoneda : string;
+  dccTasa, dccMargen, dccMontoExt : Double;
+
+  function Limpio(const s: string): string;
+  begin
+    Result := Trim(s);
+    if SameText(Result, 'null') then Result := '';
+  end;
+
+  function J1(const k1: string): string;
+  begin
+    try
+      Result := Limpio(b[k1].getStr);
+    except
+      Result := '';
+    end;
+  end;
+
+  function J2(const k1, k2: string): string;
+  begin
+    try
+      Result := Limpio(b[k1][k2].getStr);
+    except
+      Result := '';
+    end;
+  end;
+
+  function Campo(const Nombre: string): string;
+  var
+    f : TField;
+  begin
+    f := qImpCardNet.FindField(Nombre);
+    if f <> nil then Result := Trim(f.AsString) else Result := '';
+  end;
+
+  function Monto(const Nombre: string): string;
+  begin
+    Result := FormatFloat('#,##0.00', qImpCardNet.FieldByName(Nombre).AsFloat);
+  end;
+
+  function Tarjeta4: string;
+  var
+    t : string;
+  begin
+    t := J2('Card', 'CardNumber');
+    if Length(t) >= 4 then
+      Result := '****' + Copy(t, Length(t) - 3, 4)
+    else
+      Result := '';
+  end;
+
+  function ModoEntrada: string;
+  var
+    m : string;
+  begin
+    m := J2('Mode', 'Value');
+    Result := '';
+    if Length(m) > 0 then
+      case UpCase(m[1]) of
+        'D': Result := 'BANDA MAGNETICA';
+        'C': Result := 'CHIP';
+        'F': Result := 'FALLBACK';
+        'A': Result := 'CONTACTLESS';
+        'B': Result := 'CONTACTLESS FALLBACK';
+        'T': Result := 'MANUAL';
+      end;
+    if Result = '' then Result := J2('Mode', 'Description');
+    if Result = '' then Result := J2('Host', 'Description');
+  end;
+
+  function TipoCompra: string;
+  var
+    d : string;
+  begin
+    d := UpperCase(J2('Transaction', 'LoyaltyDeferredNumber'));
+    if Copy(d, 1, 2) = 'CU' then
+      Result := 'DIFERIDO ' + IntToStr(StrToIntDef(Copy(d, 3, 2), 0)) + ' CUOTAS'
+    else if Copy(d, 1, 1) = 'Q' then
+      Result := 'QUICK PAYMENT'
+    else
+      Result := 'NORMAL';
+  end;
+
+  // "31/10/2026 9:29:45 a. m." (DataTime) o "2026-10-31T12:17:44" (DateTime 3.1.0)
+  procedure FechaHora(var Fecha, Hora: string);
+  var
+    fh : string;
+    p : Integer;
+  begin
+    fh := J2('Transaction', 'DateTime');
+    if fh = '' then fh := J2('Transaction', 'DataTime');
+    p := Pos(' ', fh);
+    if (Length(fh) >= 19) and (fh[5] = '-') and (fh[11] = 'T') then
+    begin
+      Fecha := Copy(fh, 9, 2) + '/' + Copy(fh, 6, 2) + '/' + Copy(fh, 1, 4);
+      Hora  := Copy(fh, 12, 8);
+    end
+    else if p > 0 then
+    begin
+      Fecha := Copy(fh, 1, p - 1);
+      Hora  := Trim(Copy(fh, p + 1, Length(fh)));
+    end
+    else
+    begin
+      Fecha := fh;
+      Hora  := '';
+    end;
+  end;
+
+  procedure Linea(const Etiqueta, Valor: string);
+  begin
+    if Valor <> '' then
+      Writeln(arch, Etiqueta + Valor);
+  end;
+
+  procedure CrearBat(const Bat, Txt: string);
+  begin
+    AssignFile(arch, Bat);
+    Rewrite(arch);
+    try
+      Writeln(arch, 'type ' + Txt + ' > ' + vp_puerto);
+    finally
+      CloseFile(arch);
+    end;
+  end;
+
+  // ---- Ticket normal (pago en pesos) ----
+  procedure TicketNormal(const Leyenda: string; EsCopia: Boolean);
+  var
+    fecha, hora : string;
+  begin
+    FechaHora(fecha, hora);
+    Writeln(arch, dm.centro(Campo('SUCURSAL')));
+    Writeln(arch, dm.centro(Campo('DIRECCION')));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('REGISTRO DE LA TRANSACCION'));
+    if not EsCopia then
+    begin
+      Linea('No. Trans.      : ', J2('Transaction', 'Reference'));
+      Linea('Lote            : ', J1('Batch'));
+      Linea('No. de Terminal : ', J1('TerminalID'));
+      Linea('ID Comerciante  : ', J1('MerchantID'));
+    end;
+    Writeln(arch, '');
+    Linea('TARJETA         : ', J2('Card', 'Product'));
+    Writeln(arch, 'TIPO COMPRA     : ' + TipoCompra);
+    Linea('No. tarjeta     : ', Tarjeta4);
+    Linea('Modo Entrada    : ', ModoEntrada);
+    Writeln(arch, 'APROBADA        : EN LINEA');
+    if not EsCopia then
+      Linea('Cliente         : ', Copy(J2('Card', 'HolderName'), 1, 24));
+    Writeln(arch, '');
+    Writeln(arch, 'Monto RD$       : ' + Monto('montosinitbis'));
+    Writeln(arch, 'Itbis RD$       : ' + Monto('monto_itbis'));
+    Writeln(arch, 'Total RD$       : ' + Monto('monto'));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('APROBADA'));
+    Writeln(arch, '');
+    if not EsCopia then
+      Linea('No de referencia: ', J2('Transaction', 'RetrievalReference'));
+    Linea('No Autorizacion : ', J2('Transaction', 'AuthorizationNumber'));
+    Linea('Fecha           : ', fecha);
+    Linea('Hora            : ', hora);
+    Writeln(arch, '');
+    if not EsCopia then
+    begin
+      Writeln(arch, '');
+      Writeln(arch, dm.centro('_________________________'));
+      if J2('Card', 'HolderName') <> '' then
+        Writeln(arch, dm.centro(Copy(J2('Card', 'HolderName'), 1, 24)))
+      else
+        Writeln(arch, dm.centro('FIRMA'));
+      Writeln(arch, '');
+    end;
+    Writeln(arch, dm.centro(Leyenda));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('***FIN DOCUMENTO NO VENTA***'));
+  end;
+
+  // ---- Ticket DCC (cliente acepto pagar en su moneda) ----
+  procedure TicketDCC(const Leyenda: string);
+  var
+    fecha, hora : string;
+  begin
+    FechaHora(fecha, hora);
+    Writeln(arch, dm.centro(Campo('SUCURSAL')));
+    if Campo('emp_telefono') <> '' then
+      Writeln(arch, dm.centro('Telf(s):' + Campo('emp_telefono')));
+    if J1('Batch') <> '' then
+      Writeln(arch, dm.centro('Lote No:' + Copy(J1('Batch'), 1, 24)));
+    if Campo('emp_rnc') <> '' then
+      Writeln(arch, dm.centro('RNC:' + Campo('emp_rnc')));
+    Writeln(arch, '');
+    if Tarjeta4 <> '' then
+      Writeln(arch, dm.centro(Tarjeta4));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('VENTA CON DCC'));
+    Writeln(arch, '');
+    Writeln(arch, Format('%-20s %20s', [fecha, hora]));
+    Writeln(arch, '');
+    Writeln(arch, Format('%-20s %20s', ['IT: ' + J2('Card', 'Product'),
+                                        'No. REF: ' + J2('Transaction', 'Reference')]));
+    Writeln(arch, 'APROBACION                     ' + J2('Transaction', 'AuthorizationNumber'));
+    Linea('Modo Entrada    : ', ModoEntrada);
+    Writeln(arch, '');
+    Writeln(arch, 'COMPRA                    RD$: ' + Monto('montosinitbis'));
+    Writeln(arch, 'ITBIS                     RD$: ' + Monto('monto_itbis'));
+    Writeln(arch, '                          ==================');
+    Writeln(arch, 'MONTO                     RD$: ' + Monto('monto'));
+    Writeln(arch, '');
+    Linea('RRN: ', J2('Transaction', 'RetrievalReference'));
+    Writeln(arch, '');
+    // DisplayRate = pesos por 1 unidad de la moneda extranjera
+    Writeln(arch, dm.centro('TASA DE CAMBIO: 1 ' + dccMoneda + ' = RD$ ' +
+                            FormatFloat('0.00000', dccTasa)));
+    if dccMargen > 0 then
+      Writeln(arch, dm.centro('Rate Include ' + FormatFloat('0.00', dccMargen) +
+                              '% Int 1 Margin'));
+    Writeln(arch, dm.centro('Moneda Transaccion: ' + dccMoneda));
+    Writeln(arch, 'TOTAL TRANSACCION ' + dccMoneda + ': ' +
+                  FormatFloat('#,##0.00', dccMontoExt));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('[x]Me han ofrecido una seleccion de monedas,'));
+    Writeln(arch, dm.centro('incluyendo moneda local del comerciante'));
+    Writeln(arch, dm.centro('y decidi pagar en ' + dccMoneda));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('Conversion Dinamica de Moneda (DCC)'));
+    Writeln(arch, dm.centro('es ofrecido por el Establecimiento'));
+    Writeln(arch, '');
+    Linea('Terminal : ', J1('TerminalID'));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('*APROBADA*'));
+    Writeln(arch, dm.centro('*Cliente*'));
+    if J2('Card', 'HolderName') <> '' then
+      Writeln(arch, dm.centro(Copy(J2('Card', 'HolderName'), 1, 24)));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro(Leyenda));
+    Writeln(arch, '');
+    Writeln(arch, dm.centro('***Recuerde conservar su comprobante***'));
+  end;
+
+  procedure EscribirTicket(const Archivo, Leyenda: string; EsCopia: Boolean);
+  var
+    x : Integer;
+  begin
+    AssignFile(arch, Archivo);
+    Rewrite(arch);
+    try
+      if esDCC then
+        TicketDCC(Leyenda)
+      else
+        TicketNormal(Leyenda, EsCopia);
+      for x := 1 to 2 do
+        Writeln(arch, '');
+      if codigoabre = 'Termica' then
+        Write(arch, Chr(29) + 'V' + Chr(1));   // corte parcial ESC/POS
+    finally
+      CloseFile(arch);
+    end;
+  end;
 
 begin
-with qImpCardNet do begin
-Close;
-Parameters.ParamByName('emp').Value :=  QTicketemp_codigo.Value;
-Parameters.ParamByName('tic').Value :=  QTicketticket.Value;
-Parameters.ParamByName('fec').Value :=  QTicketfecha.Value;
-Parameters.ParamByName('caj').Value :=  QTicketcaja.Value;
-Parameters.ParamByName('usu').Value :=  QTicketusu_codigo.Value;
-Open;
-if qImpCardNet.RecordCount > 0 then begin
+  with qImpCardNet do
+  begin
+    Close;
+    Parameters.ParamByName('emp').Value := QTicketemp_codigo.Value;
+    Parameters.ParamByName('tic').Value := QTicketticket.Value;
+    Parameters.ParamByName('fec').Value := QTicketfecha.Value;
+    Parameters.ParamByName('caj').Value := QTicketcaja.Value;
+    Parameters.ParamByName('usu').Value := QTicketusu_codigo.Value;
+    Open;
+  end;
+  if qImpCardNet.RecordCount = 0 then Exit;
 
-      dm.Query1.Close;
-      dm.Query1.SQL.Clear;
-      dm.Query1.SQL.Add('select Puerto, codigo_abre_caja from cajas_IP');
-      dm.Query1.SQL.Add('where caja = :caj');
-      dm.Query1.Parameters.ParamByName('caj').Value := edCaja.Caption;
-      dm.Query1.Open;
-      if dm.Query1.RecordCount > 0 then begin
-      codigoabre := Trim(dm.Query1.fieldbyname('codigo_abre_caja').Value);
-      vp_puerto     := Trim(dm.Query1.fieldbyname('puerto').Value);
+  dm.Query1.Close;
+  dm.Query1.SQL.Clear;
+  dm.Query1.SQL.Add('select Puerto, codigo_abre_caja from cajas_IP');
+  dm.Query1.SQL.Add('where caja = :caj');
+  dm.Query1.Parameters.ParamByName('caj').Value := edCaja.Caption;
+  dm.Query1.Open;
+  if dm.Query1.RecordCount = 0 then Exit;
 
-  b := myJSONItem.Create;
-  b.Code :=  qImpCardNet.fieldByName('JSON').Value;
-  
-  JSONString := b.Code;
-  FieldName := '"dynamiccurrencyconversion"';
-  FieldExists := Pos(FieldName, JSONString) > 0;
+  codigoabre := Trim(dm.Query1.FieldByName('codigo_abre_caja').AsString);
+  vp_puerto  := Trim(dm.Query1.FieldByName('puerto').AsString);
 
+  // puerto.txt tiene prioridad, igual que antes
   if FileExists('.\puerto.txt') then
   begin
-    assignfile(puertopeqCardNet, '.\puerto.txt');
-    reset(puertopeqCardNet);
-    readln(puertopeqCardNet, vp_puerto);
-  end
-  else
-    puerto := 'PRN';
-   if not FieldExists then
-   begin
-      closefile(puertopeqCardNet);
+    AssignFile(fpuerto, '.\puerto.txt');
+    Reset(fpuerto);
+    try
+      Readln(fpuerto, sPuerto);
+    finally
+      CloseFile(fpuerto);
+    end;
+    if Trim(sPuerto) <> '' then vp_puerto := Trim(sPuerto);
+  end;
+  if vp_puerto = '' then vp_puerto := 'PRN';
 
-      AssignFile(archCardNet, '.\impverifone.bat');
-      rewrite(archCardNet);
-      writeln(archCardNet, 'type .\tverifone.txt > '+vp_puerto);
-      closefile(archCardNet);
+  jsonTxt := qImpCardNet.FieldByName('JSON').AsString;
 
-      //Ticket Comercio
-      AssignFile(archCardNet, '.\tverifone.txt');
-      rewrite(archCardNet);
-      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-      writeln(archCardNet,dm.centro(parametro));
-      writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
-      writeln(archCardNet,b['DataTime'].getStr);
-      parametro := IntToStr(b['Transaction']['Reference'].getInt);
-      writeln(archCardNet,'No. Trans.      : '+parametro);
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('REGISTRO ImpTicketCardNet DE LA TRANSACCION'));
-      writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
-      writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
-      writeln(archCardNet,'');
-      writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
-      if not b['Transaction']['LoyaltyDeferredNumber'].isNull then
-      writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
-      parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
-      writeln(archCardNet,'No. tarjeta     : '+parametro);
-      writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
-      writeln(archCardNet,'APROBADA        : EN LINEA');
-      writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-      writeln(archCardNet,'Monto RD$       : '+ parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-      writeln(archCardNet,'Itbis RD$       : '+parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-      writeln(archCardNet,'Total RD$       : '+parametro);
-      writeln(archCardNet,'');
-      writeln(archCardNet,DM.CENTRO('APROBADA'));
-      writeln(archCardNet,'');
-      writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
-      writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
-      writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
-      writeln(archCardNet,'');
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.Centro('_________________________'));
-      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Original Comercio***'));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
-      for x:= 1 to 2 do begin
-      writeln(archCardNet,'');
-      end;
+  b := myJSONItem.Create;
+  try
+    b.Code := jsonTxt;
 
-      if codigoabre = 'Termica' then
-      writeln(archCardNet,chr(27)+chr(109));
+    // ---- Datos DCC (se leen del texto original del bloque DCC) ----
+    esDCC       := CardNetEsDCC(jsonTxt);
+    dccBloque   := CardNetBloqueDCC(jsonTxt);
+    dccMoneda   := CardNetMoneda(CardNetBuscarClave(dccBloque, ['TransactionCurrency']));
+    dccTasa     := CardNetNumero(CardNetBuscarClave(dccBloque, ['DisplayRate']), 9);
+    dccMargen   := CardNetNumero(CardNetBuscarClave(dccBloque, ['MarginRate']), 2);
+    dccMontoExt := CardNetMontoExtranjero(CardNetBuscarClave(dccBloque, ['Amount']),
+                     qImpCardNet.FieldByName('monto').AsFloat, dccTasa);
 
-      CloseFile(archCardNet);
+    // Ticket Comercio
+    CrearBat('.\impverifone.bat', '.\tverifone.txt');
+    EscribirTicket('.\tverifone.txt', '***Original Comercio***', False);
+    WinExec('.\impverifone.bat', 0);
 
-     winexec('.\impverifone.bat',0);
-
-     //Ticket Copia
-      AssignFile(archCardNet, '.\tverifoneCopia.bat');
-      rewrite(archCardNet);
-      writeln(archCardNet, 'type .\tverifoneCopia.txt > '+vp_puerto);
-      closefile(archCardNet);
-
-      AssignFile(archCardNet, '.\tverifoneCopia.txt');
-      rewrite(archCardNet);
-      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-      writeln(archCardNet,dm.centro(parametro));
-      writeln(archCardNet,dm.centro(qImpCardNet.FieldByName('DIRECCION').text));
-      writeln(archCardNet,b['DataTime'].getStr);
-      //parametro := IntToStr(b['Transaction']['Reference'].getInt);
-      //writeln(archCardNet,'No. Trans.      : '+parametro);
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('REGISTRO ImpTicketCardNet DE LA TRANSACCION'));
-      //writeln(archCardNet,'No. de Terminal : '+b['TerminalID'].getStr);
-      //writeln(archCardNet,'ID Comerciante  : '+b['MerchantID'].getStr);
-      writeln(archCardNet,'');
-      writeln(archCardNet,'TARJETA         : ' +b['Card']['Product'].getStr);
-      //writeln(archCardNet,'TIPO COMPRA     : '+b['Transaction']['LoyaltyDeferredNumber'].getStr);
-      parametro  := copy(b['Card']['CardNumber'].getStr,Length(b['Card']['CardNumber'].getStr)-3,Length(b['Card']['CardNumber'].getStr));
-      writeln(archCardNet,'No. tarjeta     : '+parametro);
-      writeln(archCardNet,'Modo Entrada    : '+b['Host']['Description'].getStr);
-      writeln(archCardNet,'APROBADA        : EN LINEA');
-      //writeln(archCardNet,'Cliente         : '+copy(b['Card']['HolderName'].getStr,1,24));
-      //writeln(archCardNet,'');
-      writeln(archCardNet,'');
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-      writeln(archCardNet,'Monto RD$       : '+ parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-      writeln(archCardNet,'Itbis RD$       : '+parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-      writeln(archCardNet,'Total RD$       : '+parametro);
-      //writeln(archCardNet,'');
-      //writeln(archCardNet,'');
-      writeln(archCardNet,DM.CENTRO('APROBADA'));
-     // writeln(archCardNet,'');
-     // writeln(archCardNet,'');
-     // writeln(archCardNet,'No de referencia: '+b['Transaction']['RetrievalReference'].getStr);
-      writeln(archCardNet,'No Autorizacion : '+b['Transaction']['AuthorizationNumber'].getStr);
-      writeln(archCardNet,'Fecha            : '+copy(b['Transaction']['DataTime'].getStr,1,23));
-     // writeln(archCardNet,'Hora             : '+trim(copy(b['Transaction']['DataTime'].getStr,12,20)));
-      //writeln(archCardNet,'');
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Copia Cliente***'));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***FIN DOCUMENTO NO VENTA***'));
-
-      for x:= 1 to 2 do begin
-      writeln(archCardNet,'');
-      end;
-
-      if codigoabre = 'Termica' then
-      writeln(archCardNet,chr(27)+chr(109));
-
-      CloseFile(archCardNet);
-
-     winexec('.\tverifoneCopia.bat',0);
-
-     vl_respverifone := '';
-     vl_tarjeta := '';
-   end
-   else
-   begin
-      // Obtener la cadena completa de la fecha y hora
-      FechaHora := b['Transaction']['DataTime'].getStr;
-      // Extraer la fecha (primeros 10 caracteres: "18/11/2024")
-      Fecha := Copy(FechaHora, 1, 10);
-      // Extraer la hora (desde el carï¿½cter 12 hasta el final: "12:48:21 p. m.")
-      Hora := Copy(FechaHora, 12, Length(FechaHora) - 11);
-      // Crear una cadena con fecha a la izquierda y hora a la derecha
-      Linea := Format('%-20s %20s', [Fecha, Hora]);
-      //Pago con tarjeta extranjera
-      closefile(puertopeqCardNet);
-      AssignFile(archCardNet, '.\impverifone.bat');
-      rewrite(archCardNet);
-      writeln(archCardNet, 'type .\tverifone.txt > '+vp_puerto);
-      closefile(archCardNet);
-
-      //Ticket Comercio
-      AssignFile(archCardNet, '.\tverifone.txt');
-      rewrite(archCardNet);
-      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-      writeln(archCardNet,dm.centro(parametro));
-      writeln(archCardNet, dm.centro('Telf(s):' + qImpCardNet.FieldByName('emp_telefono').Text));
-      writeln(archCardNet, dm.centro('Lote No:'+ copy(b['Batch'].getStr, 1, 24)));
-      writeln(archCardNet, dm.centro('RNC:' + qImpCardNet.FieldByName('emp_rnc').Text));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro(b['Card']['CardNumber'].getStr));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('VENTA CON DCC'));
-      writeln(archCardNet,'');
-      Writeln(archCardNet, Linea);
-      writeln(archCardNet,'');
-      // Formatear la salida con IT a la izquierda y el nï¿½mero de referencia a la derecha
-      LineaCard := Format('%-20s %20s',
-      ['IT: ' + b['Card']['Product'].getStr,'No. REF: ' + b['Transaction']['Reference'].getStr]);
-      Writeln(archCardNet, LineaCard);
-      writeln(archCardNet,'APROBACION                     '+b['Transaction']['AuthorizationNumber'].getStr);
-      writeln(archCardNet,'');
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-      writeln(archCardNet,'COMPRA                    RD$: '+ parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-      writeln(archCardNet,'ITBIS                     RD$: '+parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-
-      writeln(archCardNet,'                          ==================');
-      writeln(archCardNet,'MONTO                     RD$: '+parametro);
-      writeln(archCardNet,'');
-      writeln(archCardNet,'RRN: '+b['Transaction']['RetrievalReference'].getStr);
-      writeln(archCardNet,'');
-
-      // Extraer el valor bruto de DisplayRate
-      DisplayRateRaw := b['DynamicCurrencyConversion']['DisplayRate'].getStr;
-
-      // Convertirlo a un nï¿½mero real dividiendo por 100,000
-      DisplayRateReal := StrToFloat(DisplayRateRaw) / 1000000000;
-
-      Writeln(archCardNet,dm.centro(Format('TASA DE CAMBIO: 1 USD = %.5f', [DisplayRateReal])));
-
-      // Extraer el margen bruto
-      MarginRateRaw := b['DynamicCurrencyConversion']['MarginRate'].getStr;
-      // Convertirlo a un porcentaje dividiendo por 100
-      MarginRatePercent := StrToFloat(MarginRateRaw) / 100;
-
-      Writeln(archCardNet,dm.centro(Format('Rate Include %.2f%% Int 1 Margin', [MarginRatePercent])));
-      Writeln(archCardNet, dm.centro(Format('Moneda Transacción: %s', [b['DynamicCurrencyConversion']['TransactionCurrency'].getStr])));
-
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value/DisplayRateReal);
-      writeln(archCardNet,'TOTAL TRANSACCION USD: '+parametro);
-      writeln(archCardNet,'');
-
-      writeln(archCardNet,dm.centro('[x]Me han ofrecido una seleccion de monedas,'));
-      writeln(archCardNet,dm.centro('incluyendo moneda local del comerciante'));
-      writeln(archCardNet,dm.centro('y decidi pagar en USD'));
-
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('Conversion Dinamica de Moneda (DCC)'));
-      writeln(archCardNet,dm.centro('es ofrecido por el Establecimiento'));
-
-      writeln(archCardNet,'');
-      writeln(archCardNet,'Terminal : '+b['TerminalID'].getStr);
-      writeln(archCardNet,'');
-      writeln(archCardNet,DM.CENTRO('*APROBADA*'));
-      writeln(archCardNet,DM.CENTRO('*Cliente*'));
-      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Original Comercio***'));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Recuerde conservar su comprobante***'));
-
-      for x:= 1 to 2 do begin
-      writeln(archCardNet,'');
-      end;
-
-      if codigoabre = 'Termica' then
-      writeln(archCardNet,chr(27)+chr(109));
-
-      CloseFile(archCardNet);
-
-     winexec('.\impverifone.bat',0);
-
-     //Ticket Copia
-      AssignFile(archCardNet, '.\tverifoneCopia.bat');
-      rewrite(archCardNet);
-      writeln(archCardNet, 'type .\tverifoneCopia.txt > '+vp_puerto);
-      closefile(archCardNet);
-
-      AssignFile(archCardNet, '.\tverifoneCopia.txt');
-      rewrite(archCardNet);
-      parametro := qImpCardNet.fieldbyname('SUCURSAL').Text;
-      writeln(archCardNet,dm.centro(parametro));
-      writeln(archCardNet, dm.centro('Telf(s):' + qImpCardNet.FieldByName('emp_telefono').Text));
-      writeln(archCardNet, dm.centro('Lote No:'+ copy(b['Batch'].getStr, 1, 24)));
-      writeln(archCardNet, dm.centro('RNC:' + qImpCardNet.FieldByName('emp_rnc').Text));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro(b['Card']['CardNumber'].getStr));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('VENTA CON DCC'));
-      writeln(archCardNet,'');
-      Writeln(archCardNet, Linea);
-      writeln(archCardNet,'');
-      // Formatear la salida con IT a la izquierda y el nï¿½mero de referencia a la derecha
-      LineaCard := Format('%-20s %20s',
-      ['IT: ' + b['Card']['Product'].getStr,'No. REF: ' + b['Transaction']['Reference'].getStr]);
-      Writeln(archCardNet, LineaCard);
-      writeln(archCardNet,'APROBACION                     '+b['Transaction']['AuthorizationNumber'].getStr);
-      writeln(archCardNet,'');
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('montosinitbis').Value);
-      writeln(archCardNet,'COMPRA                    RD$: '+ parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto_itbis').Value);
-      writeln(archCardNet,'ITBIS                     RD$: '+parametro);
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value);
-
-      writeln(archCardNet,'                          ==================');
-      writeln(archCardNet,'MONTO                     RD$: '+parametro);
-      writeln(archCardNet,'');
-      writeln(archCardNet,'RRN: '+b['Transaction']['RetrievalReference'].getStr);
-      writeln(archCardNet,'');
-
-      // Extraer el valor bruto de DisplayRate
-      DisplayRateRaw := b['DynamicCurrencyConversion']['DisplayRate'].getStr;
-
-      // Convertirlo a un nï¿½mero real dividiendo por 100,000
-      DisplayRateReal := StrToFloat(DisplayRateRaw) / 1000000000;
-
-      Writeln(archCardNet,dm.centro(Format('TASA DE CAMBIO: 1 USD = %.5f', [DisplayRateReal])));
-
-      // Extraer el margen bruto
-      MarginRateRaw := b['DynamicCurrencyConversion']['MarginRate'].getStr;
-      // Convertirlo a un porcentaje dividiendo por 100
-      MarginRatePercent := StrToFloat(MarginRateRaw) / 100;
-
-      Writeln(archCardNet,dm.centro(Format('Rate Include %.2f%% Int 1 Margin', [MarginRatePercent])));
-      Writeln(archCardNet, dm.centro(Format('Moneda Transacciï¿½n: %s', [b['DynamicCurrencyConversion']['TransactionCurrency'].getStr])));
-
-      parametro := FormatCurr('#,0.00',qImpCardNet.FieldByName('monto').Value/DisplayRateReal);
-      writeln(archCardNet,'TOTAL TRANSACCION USD: '+parametro);
-      writeln(archCardNet,'');
-
-      writeln(archCardNet,dm.centro('[x]Me han ofrecido una seleccion de monedas,'));
-      writeln(archCardNet,dm.centro('incluyendo moneda local del comerciante'));
-      writeln(archCardNet,dm.centro('y decidi pagar en USD'));
-
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('Conversion Dinamica de Moneda (DCC)'));
-      writeln(archCardNet,dm.centro('es ofrecido por el Establecimiento'));
-
-      writeln(archCardNet,'');
-      writeln(archCardNet,'Terminal : '+b['TerminalID'].getStr);
-      writeln(archCardNet,'');
-      writeln(archCardNet,DM.CENTRO('*APROBADA*'));
-      writeln(archCardNet,DM.CENTRO('*Cliente*'));
-      writeln(archCardNet,dm.centro(copy(b['Card']['HolderName'].getStr,1,24)));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Copia Cliente***'));
-      writeln(archCardNet,'');
-      writeln(archCardNet,dm.centro('***Recuerde conservar su comprobante***'));
-
-      for x:= 1 to 2 do begin
-      writeln(archCardNet,'');
-      end;
-
-      if codigoabre = 'Termica' then
-      writeln(archCardNet,chr(27)+chr(109));
-
-      CloseFile(archCardNet);
-
-     winexec('.\tverifoneCopia.bat',0);
-
-     vl_respverifone := '';
-     vl_tarjeta := '';
-   end;
- end;
-
-end;
-end;
-
+    // Ticket Copia
+    CrearBat('.\tverifoneCopia.bat', '.\tverifoneCopia.txt');
+    EscribirTicket('.\tverifoneCopia.txt', '***Copia Cliente***', True);
+    WinExec('.\tverifoneCopia.bat', 0);
+  finally
+    b.Free;
+    vl_respverifone := '';
+    vl_tarjeta := '';
+  end;
 end;
 
 procedure TfrmMain.pnabrircaja2;

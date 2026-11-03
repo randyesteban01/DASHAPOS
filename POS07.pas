@@ -192,6 +192,26 @@ WITH DM.Query1 do begin
   timeout     := DM.Query1.FieldByName('TIMEOUT').Value;
 
   result := core.SetTimeOut(timeOut);
+
+  // Si la DLL registrada no coincide con el wrapper compilado, las llamadas
+  // devuelven vacio y la siguiente puede cerrar el sistema. Se detiene aqui.
+  if not CardNetRespuestaOK(result) then
+  begin
+    dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value, 1, dm.Usuario, 0,
+      'SetTimeOut no respondio: ' + result, 'E', 'T', 0, 0);
+    btnPOS.Visible        := False;
+    frmCombinado.Width    := 432;
+    rgTipoVenta.Visible   := False;
+    lbCantCuotas.Visible  := False;
+    cbbCantCuotas.Visible := False;
+    frmMain.vp_verifone   := False;
+    MessageDlg('EL COMPONENTE DEL VERIFONE NO RESPONDE.' + #13 +
+               'La version de la DLL ECRti no coincide con el sistema.' + #13 +
+               'Avise a soporte. Puede cobrar con tarjeta manualmente.',
+               mtWarning, [mbOk], 0);
+    Exit;
+  end;
+
   result := core.SetLocalEndPoint(ipLocal, portLocal);
   result := core.SetRemoteEndPoint(ipRemote, portRemote);
   frmMain.vp_verifone := False;
@@ -459,94 +479,87 @@ end;
 
 procedure TfrmCombinado.btnPOSClick(Sender: TObject);
 var
-ResponseMemo : String;
-amount, tax, otherTaxes, quantyOfPayments : Integer;
-tamount, ttax :Currency;
-a : myJSONItem;
+  ResponseMemo : String;
+  amount, tax, otherTaxes, quantyOfPayments : Integer;
+  tamount, ttax : Currency;
 begin
-try
-  if edtarjeta.Text = '' then
-  lbTarjeta.Caption := format('%n',[Total - Pagado]);
+  try
+    if edtarjeta.Text = '' then
+      lbTarjeta.Caption := format('%n',[Total - Pagado]);
 
+    if Pagado = 0 then
+    begin
+      ShowMessage('DEBES INDICAR EL MONTO A PAGAR....');
+      edtarjeta.SetFocus;
+      Exit;
+    end;
+    btnPOS.Enabled := False;
 
+    ResponseMemo := '';
 
-  IF Pagado = 0 THEN BEGIN
-   ShowMessage('DEBES INDICAR EL MONTO A PAGAR....');
-   edtarjeta.SetFocus;
-   Exit;
-  end;
-  btnPOS.Enabled := False;
+    if rgTipoVenta.ItemIndex = 0 then
+      quantyOfPayments := 0
+    else
+      quantyOfPayments := StrToIntDef(cbbCantCuotas.Text, 0);
 
-  ResponseMemo := '';
+    // El monto de la tarjeta ya incluye ITBIS
+    if (Trim(edtarjeta.Text) <> '') and (frmMain.QTicketitbis.Value > 0) then
+      ttax := (edtarjeta.Value / 1.18) * 0.18
+    else
+      ttax := 0;
 
-  if rgTipoVenta.ItemIndex = 0 then
-  quantyOfPayments := 0 else
-  quantyOfPayments := StrToInt(cbbCantCuotas.Text);
+    tax        := StrToInt(DM.QuitarPuntosDecimal(ttax));
+    tamount    := edtarjeta.Value;
+    amount     := StrToInt(dm.QuitarPuntosDecimal(tamount));
+    otherTaxes := 0;
+    invoiceId  := frmMain.QTicketticket.Value;
 
+    result := core.Initialice();
+    if not CardNetRespuestaOK(result) then
+    begin
+      ShowMessage('NO SE PUDO CONECTAR CON EL VERIFONE.' + Char(13) +
+                  'Verifique que el terminal este encendido y en espera, e intente de nuevo.' +
+                  Char(13) + Char(13) + result);
+      frmMain.vp_verifone := False;
+      btnPOS.Enabled := True;
+      edtarjeta.SetFocus;
+      Exit;
+    end;
 
-  if ((Trim(edtarjeta.Text)<>'') and ((frmMain.QTicketitbis.Value) > 0)) then
-  ttax :=  edtarjeta.Value*0.18 else
-  ttax := 0;
+    case rgTipoVenta.ItemIndex of
+      0: response := core.ProcessNormalSale(amount, tax, otherTaxes, invoiceId);
+      1: response := core.ProcessDeferredSale(amount, tax, otherTaxes, invoiceId, quantyOfPayments);
+    end;
 
-  tax := StrToInt(DM.QuitarPuntosDecimal(ttax));
+    case rgTipoVenta.ItemIndex of
+      0: dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value,1,dm.Usuario,invoiceId,response,'N','T',amount,tax);
+      1: dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value,1,dm.Usuario,invoiceId,response,'O','T',amount,tax);
+    end;
 
-  tamount := edtarjeta.Value;
+    ResponseMemo := response;
+    frmMain.vl_respverifone := ResponseMemo;
 
-  amount := StrToInt(dm.QuitarPuntosDecimal(tamount));
-
-
-  otherTaxes := 0;
-
-  invoiceId := frmMain.QTicketticket.Value;
-
-  result := core.Initialice();
-  case rgTipoVenta.ItemIndex of
-  0:response := core.ProcessNormalSale(amount, tax, otherTaxes, invoiceId);
-  1:response := core.ProcessDeferredSale(amount, tax, otherTaxes, invoiceId, quantyOfPayments);
-  end;
-
-  case rgTipoVenta.ItemIndex of
-  0:dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value,1,dm.Usuario,invoiceId,response,'N','T',amount,tax);
-  1:dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value,1,dm.Usuario,invoiceId,response,'O','T',amount,tax);
-  end;
-
-
-  ResponseMemo := response;
-
-  frmMain.vl_respverifone := ResponseMemo;
-
-
-  if Length(ResponseMemo)< 180 then begin
-  a := myJSONItem.Create;
-  a.Code :=  ResponseMemo;
-  ShowMessage('FAVOR REVISE LA CONEXION, FALLO LA TRANSACCION '+Char(13)+ResponseMemo);
-  frmMain.vp_verifone := False;
-  btnPOS.Enabled := True;
-  edtarjeta.SetFocus;
-  end
-  else
-  if Length(ResponseMemo)> 180 then begin
-  a := myJSONItem.Create;
-  a.Code :=  ResponseMemo;
-
-  //edDescrip.Text := DM.Query1.FieldByName('CardNumber').Text + ' / '+
-  //                  DM.Query1.FieldByName('AuthorizationNumber').Text;
-
-  {edtarjeta.Text := copy(a['Card']['CardNumber'].getStr,Length(a['Card']['CardNumber'].getStr)-3,Length(a['Card']['CardNumber'].getStr)) + ' / '+
-                    a['Transaction']['AuthorizationNumber'].getStr;
-   }
-  frmMain.vp_verifone := True;
-  btimprimirClick(Sender);
-  end
-  else
-  begin
-  frmMain.vp_verifone := True;
-  end;
-except
+    if Length(ResponseMemo) < 180 then
+    begin
+      ShowMessage('FAVOR REVISE LA CONEXION, FALLO LA TRANSACCION '+Char(13)+ResponseMemo);
+      frmMain.vp_verifone := False;
+      btnPOS.Enabled := True;
+      edtarjeta.SetFocus;
+    end
+    else if Length(ResponseMemo) > 180 then
+    begin
+      frmMain.vp_verifone := True;
+      btimprimirClick(Sender);
+    end
+    else
+      frmMain.vp_verifone := True;
+  except
     on E : Exception do
+    begin
+      btnPOS.Enabled := True;
       ShowMessage(E.ClassName+' error raised, with message : '+E.Message);
-end;
-
+    end;
+  end;
 end;
 
 end.

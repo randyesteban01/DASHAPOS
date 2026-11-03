@@ -224,6 +224,26 @@ WITH DM.Query1 do begin
   timeout     := DM.Query1.FieldByName('TIMEOUT').Value;
 
   result := core.SetTimeOut(timeOut);
+
+  // Si la DLL registrada no coincide con el wrapper compilado, las llamadas
+  // devuelven vacio y la siguiente puede cerrar el sistema. Se detiene aqui.
+  if not CardNetRespuestaOK(result) then
+  begin
+    dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value, 1, dm.Usuario, 0,
+      'SetTimeOut no respondio: ' + result, 'E', 'T', 0, 0);
+    btnPOS.Visible        := False;
+    frmTarjeta.Width      := 475;
+    rgTipoVenta.Visible   := False;
+    lbCantCuotas.Visible  := False;
+    cbbCantCuotas.Visible := False;
+    frmMain.vp_verifone   := False;
+    MessageDlg('EL COMPONENTE DEL VERIFONE NO RESPONDE.' + #13 +
+               'La version de la DLL ECRti no coincide con el sistema.' + #13 +
+               'Avise a soporte. Puede cobrar con tarjeta manualmente.',
+               mtWarning, [mbOk], 0);
+    Exit;
+  end;
+
   result := core.SetLocalEndPoint(ipLocal, portLocal);
   result := core.SetRemoteEndPoint(ipRemote, portRemote);
   frmMain.vp_verifone := False;
@@ -307,17 +327,17 @@ end;
 
 procedure TfrmTarjeta.btnPOSClick(Sender: TObject);
 var
-  ResponseMemo: String;
+  ResponseMemo, cardNum : String;
   amount, tax, otherTaxes, quantyOfPayments: Integer;
   tamount, ttax: Currency;
   a: myJSONItem;
-  resultCode: Integer;  // Variable para almacenar el código convertido
 begin
+  a := nil;
   try
     btnPOS.Enabled := False;
     ResponseMemo := '';
 
-    // Validar número de cuotas
+    // Validar numero de cuotas
     if rgTipoVenta.ItemIndex = 0 then
       quantyOfPayments := 0
     else
@@ -340,7 +360,7 @@ begin
     amount := StrToIntDef(dm.QuitarPuntosDecimal(tamount), 0);
     if amount <= 0 then
     begin
-      ShowMessage('Error: No se pudo obtener un monto válido.');
+      ShowMessage('Error: No se pudo obtener un monto valido.');
       btnPOS.Enabled := True;
       Exit;
     end;
@@ -349,13 +369,15 @@ begin
     TimerPOS.Interval := 20000; // 20 segundos de espera
     TimerPOS.Enabled := True;
 
-    // Inicializar comunicación con el dispositivo
+    // Inicializar comunicacion con el dispositivo
     result := core.Initialice();
-    resultCode := StrToIntDef(result, -1);  // Convertir a número (si no es válido, toma -1)
-
-    if resultCode <> 0 then
+    if not CardNetRespuestaOK(result) then
     begin
-      ShowMessage('Error al inicializar el dispositivo de pago. Código: ' + IntToStr(resultCode ));
+      TimerPOS.Enabled := False;
+      ShowMessage('NO SE PUDO CONECTAR CON EL VERIFONE.' + Char(13) +
+                  'Verifique que el terminal este encendido y en espera, e intente de nuevo.' +
+                  Char(13) + Char(13) + result);
+      frmMain.vp_verifone := False;
       btnPOS.Enabled := True;
       Exit;
     end;
@@ -363,7 +385,7 @@ begin
     invoiceId := frmMain.QTicketticket.Value;
     otherTaxes := 0;
 
-    // Procesar la transacción
+    // Procesar la transaccion
     case rgTipoVenta.ItemIndex of
       0: response := core.ProcessNormalSale(amount, tax, otherTaxes, invoiceId);
       1: response := core.ProcessDeferredSale(amount, tax, otherTaxes, invoiceId, quantyOfPayments);
@@ -375,7 +397,7 @@ begin
       1: dm.GrabaLogCardNet(DM.QEmpresaemp_codigo.Value, 1, dm.Usuario, invoiceId, response, 'O', 'T', amount, tax);
     end;
 
-    // Si la respuesta llegó correctamente, detener el temporizador
+    // Si la respuesta llego, detener el temporizador
     TimerPOS.Enabled := False;
 
     ResponseMemo := response;
@@ -391,33 +413,37 @@ begin
     end
     else
     begin
-      try
-        a := myJSONItem.Create;
-        a.Code := ResponseMemo;
+      a := myJSONItem.Create;
+      a.Code := ResponseMemo;
 
-        if a.Has['Card'] and a.Has['Transaction'] then
-        begin
-          edtarjeta.Text := Copy(a['Card']['CardNumber'].getStr, Length(a['Card']['CardNumber'].getStr) - 3, Length(a['Card']['CardNumber'].getStr)) +
-                            ' / ' + a['Transaction']['AuthorizationNumber'].getStr;
-          frmMain.vp_verifone := True;
-          btimprimirClick(Sender);
-        end
+      if a.Has['Card'] and a.Has['Transaction'] then
+      begin
+        cardNum := Trim(a['Card']['CardNumber'].getStr);
+        // Tarjeta digitada: CardNumber viene null, se usa el producto
+        if (Length(cardNum) >= 4) and not SameText(cardNum, 'null') then
+          edtarjeta.Text := Copy(cardNum, Length(cardNum) - 3, 4)
         else
-        begin
-          ShowMessage('Respuesta incompleta del dispositivo de pago.');
-          btnPOS.Enabled := True;
-        end;
-      finally
-        a.Free;
+          edtarjeta.Text := a['Card']['Product'].getStr;
+        edtarjeta.Text := edtarjeta.Text + ' / ' + a['Transaction']['AuthorizationNumber'].getStr;
+
+        frmMain.vp_verifone := True;
+        btimprimirClick(Sender);
+      end
+      else
+      begin
+        ShowMessage('Respuesta incompleta del dispositivo de pago.');
+        btnPOS.Enabled := True;
       end;
     end;
   except
     on E: Exception do
     begin
+      TimerPOS.Enabled := False;
       ShowMessage('Error: ' + E.ClassName + ' - ' + E.Message);
       btnPOS.Enabled := True;
     end;
   end;
+  a.Free;
 end;
 
 {procedure TfrmTarjeta.btnPOSClick(Sender: TObject);
