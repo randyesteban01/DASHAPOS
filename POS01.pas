@@ -253,11 +253,165 @@ var
   Impresora :TImpresora;
   PCNombre,IP :String;
   dirTmp:String;
+// ---- CardNET: funciones de apoyo para leer la respuesta del Verifone ----
+function CardNetBuscarClave(const Json: string; const Claves: array of string): string;
+function CardNetBloqueDCC(const Json: string): string;
+function CardNetNumero(const s: string; DecImplicitos: Integer): Double;
+function CardNetMoneda(const s: string): string;
+function CardNetRespuestaOK(const r: string): Boolean;
+function CardNetEsDCC(const Json: string): Boolean;
+function CardNetMontoExtranjero(const AmountStr: string; MontoRD, Tasa: Double): Double;
+
 implementation
 
 uses printers;
 
 {$R *.dfm}
+
+// Busca una clave en cualquier parte del texto JSON (sin distinguir
+// mayusculas) y devuelve su valor. "null" se devuelve como vacio.
+function CardNetBuscarClave(const Json: string; const Claves: array of string): string;
+var
+  i, p, q : Integer;
+  up : string;
+begin
+  Result := '';
+  up := UpperCase(Json);
+  for i := Low(Claves) to High(Claves) do
+  begin
+    p := Pos('"' + UpperCase(Claves[i]) + '"', up);
+    if p > 0 then
+    begin
+      p := p + Length(Claves[i]) + 2;
+      while (p <= Length(Json)) and ((Json[p] = ' ') or (Json[p] = ':')) do
+        Inc(p);
+      if (p <= Length(Json)) and (Json[p] = '"') then
+      begin
+        Inc(p);
+        q := p;
+        while (q <= Length(Json)) and (Json[q] <> '"') do
+          Inc(q);
+      end
+      else
+      begin
+        q := p;
+        while (q <= Length(Json)) and (Json[q] <> ',') and
+              (Json[q] <> '}') and (Json[q] <> ']') do
+          Inc(q);
+      end;
+      Result := Trim(Copy(Json, p, q - p));
+      if SameText(Result, 'null') then Result := '';
+      if Result <> '' then Exit;
+    end;
+  end;
+end;
+
+// Devuelve solo el bloque "DynamicCurrencyConversion": { ... } del JSON,
+// para que "Amount" no se confunda con otro campo del mismo nombre.
+function CardNetBloqueDCC(const Json: string): string;
+var
+  p, q, nivel : Integer;
+begin
+  Result := '';
+  p := Pos('"DYNAMICCURRENCYCONVERSION"', UpperCase(Json));
+  if p = 0 then Exit;
+  while (p <= Length(Json)) and (Json[p] <> '{') do
+  begin
+    if Json[p] = ',' then Exit;          // "DynamicCurrencyConversion": null
+    Inc(p);
+  end;
+  if p > Length(Json) then Exit;
+  q := p;
+  nivel := 0;
+  while q <= Length(Json) do
+  begin
+    if Json[q] = '{' then Inc(nivel)
+    else if Json[q] = '}' then
+    begin
+      Dec(nivel);
+      if nivel = 0 then Break;
+    end;
+    Inc(q);
+  end;
+  Result := Copy(Json, p, q - p + 1);
+end;
+
+// Texto a numero sin depender de la configuracion regional. Si viene sin
+// punto decimal aplica los decimales implicitos del manual de CardNET
+// (tasa = 9 decimales, margen = 2 decimales, monto = 2 decimales).
+function CardNetNumero(const s: string; DecImplicitos: Integer): Double;
+var
+  v : Double;
+  code, i : Integer;
+  t : string;
+begin
+  Result := 0;
+  t := StringReplace(Trim(s), ',', '.', [rfReplaceAll]);
+  if t = '' then Exit;
+  Val(t, v, code);
+  if code <> 0 then Exit;
+  if Pos('.', t) = 0 then
+    for i := 1 to DecImplicitos do
+      v := v / 10;
+  Result := v;
+end;
+
+// TransactionCurrency puede venir como codigo ISO numerico o alfabetico
+function CardNetMoneda(const s: string): string;
+begin
+  Result := UpperCase(Trim(s));
+  if Result = '840' then Result := 'USD'
+  else if Result = '978' then Result := 'EUR'
+  else if Result = '124' then Result := 'CAD'
+  else if Result = '826' then Result := 'GBP'
+  else if Result = '214' then Result := 'DOP';
+end;
+
+// Respuesta correcta de SetTimeOut / Initialice. Segun la version de la DLL
+// viene como JSON con "Successful" o como el codigo "0".
+function CardNetRespuestaOK(const r: string): Boolean;
+begin
+  Result := (Pos('"SUCCESSFUL"', UpperCase(r)) > 0) or (Trim(r) = '0');
+end;
+
+// True solo si el cliente ACEPTO pagar en su moneda (no basta con que
+// exista el bloque DynamicCurrencyConversion: tambien viene si lo rechazo).
+function CardNetEsDCC(const Json: string): Boolean;
+var
+  bloque, acepto, moneda : string;
+  tasa : Double;
+begin
+  Result := False;
+  bloque := CardNetBloqueDCC(Json);
+  if bloque = '' then Exit;
+  acepto := UpperCase(CardNetBuscarClave(bloque, ['CalculationAccepted']));
+  moneda := CardNetMoneda(CardNetBuscarClave(bloque, ['TransactionCurrency']));
+  tasa   := CardNetNumero(CardNetBuscarClave(bloque, ['DisplayRate']), 9);
+  if (moneda = '') or (moneda = 'DOP') or (tasa <= 0) then Exit;
+  // El manual dice Y/N/D; la DLL 3.1.0 devuelve palabras ("Accepted", "Declined").
+  // Si la DLL no manda CalculationAccepted, se mantiene el comportamiento anterior.
+  Result := (acepto = 'Y') or (acepto = 'TRUE') or (acepto = 'ACCEPTED') or
+            (acepto = '');
+end;
+
+// Monto cobrado en moneda extranjera. Usa "Amount" del bloque DCC, probando
+// si viene con 2 decimales implicitos o ya con decimales, y se queda con el que
+// cuadra con monto RD$ / tasa. Si ninguno cuadra (o no viene), usa el calculo.
+function CardNetMontoExtranjero(const AmountStr: string; MontoRD, Tasa: Double): Double;
+var
+  calculado, conDec, sinDec : Double;
+begin
+  if Tasa > 0 then calculado := MontoRD / Tasa else calculado := 0;
+  Result := calculado;
+  if calculado <= 0 then Exit;
+  conDec := CardNetNumero(AmountStr, 2);
+  sinDec := CardNetNumero(AmountStr, 0);
+  if (conDec > 0) and (Abs(conDec - calculado) <= calculado * 0.05) then
+    Result := conDec
+  else if (sinDec > 0) and (Abs(sinDec - calculado) <= calculado * 0.05) then
+    Result := sinDec;
+end;
+
 
 { TDM }
 
